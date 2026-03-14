@@ -1,0 +1,2552 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#2A4740">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Resonanz">
+<meta name="description" content="GFK-gestützte Nachrichtenverarbeitung — verstehe, was Nachrichten wirklich sagen">
+<title>Resonanz</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
+<script>
+// ── Service Worker (external sw.js) ──────────────
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js', {scope:'./'})
+    .then(reg => {
+      console.log('SW registered:', reg.scope);
+      checkIncomingShare();
+    })
+    .catch(err => console.warn('SW registration failed:', err));
+}
+
+// ── Check for incoming share on page load ─────────
+async function checkIncomingShare(){
+  const params = new URLSearchParams(location.search);
+
+  // GET share fallback (text via URL param)
+  const urlText = params.get('text') || params.get('url') || '';
+  if(urlText && !params.has('shared')){
+    history.replaceState({}, '', location.pathname);
+    window.__pendingShareText = urlText;
+    return;
+  }
+
+  if(!params.has('shared')) return;
+  history.replaceState({}, '', location.pathname);
+  if(!('caches' in window)) return;
+
+  const sc = await caches.open('resonanz-share');
+
+  // Text
+  const textR = await sc.match('/__share_text').catch(() => null);
+  if(textR){
+    const d = await textR.json();
+    if(d.text) window.__pendingShareText = d.text;
+    await sc.delete('/__share_text');
+  }
+
+  // Audio files
+  const metaR = await sc.match('/__share_audio_meta').catch(() => null);
+  if(metaR){
+    const meta = await metaR.json();
+    const files = [];
+    for(const f of meta.files){
+      const fr = await sc.match('/__share_audio_' + f.idx).catch(() => null);
+      if(fr){
+        const ab = await fr.arrayBuffer();
+        files.push(new File([ab], f.name, {type: f.type || 'audio/ogg'}));
+        await sc.delete('/__share_audio_' + f.idx);
+      }
+    }
+    await sc.delete('/__share_audio_meta');
+    if(files.length) window.__pendingShareFiles = files;
+  }
+}
+
+// Handle GET share immediately (no SW needed)
+(function(){
+  const p = new URLSearchParams(location.search);
+  const t = p.get('text') || p.get('url') || '';
+  if(t && !p.has('shared')){
+    history.replaceState({}, '', location.pathname);
+    window.__pendingShareText = t;
+  }
+})();
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F2EDE5;
+  --sur:#FDFAF7;
+  --sur2:#EBE5DC;
+  --p:#2A4740;--pl:#38594F;
+  --acc:#B55A2C;
+  --gold:#9A7A46;
+  --tx:#18281F;--txm:#44584F;--txs:#8A9890;
+  --bd:rgba(42,71,64,.1);--bds:rgba(42,71,64,.18);
+  --ora:#C15A28;
+  --r:14px;--rl:20px;--rxl:28px;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+html{height:100%;scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-height:100%;font-size:15px;line-height:1.65;-webkit-font-smoothing:antialiased;overscroll-behavior:none}
+
+/* ─── LAYOUT ─── */
+.app{display:flex;flex-direction:column;min-height:100svh}
+
+/* ─── HEADER ─── */
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;background:var(--sur);border-bottom:.5px solid var(--bd);position:sticky;top:0;z-index:60}
+.hdr-brand{font-family:'Cormorant Garamond',serif;font-size:1.4rem;font-weight:400;color:var(--p);letter-spacing:-.02em}
+.hdr-right{display:flex;align-items:center;gap:8px}
+
+/* Model pill — status only, click opens settings */
+.mpill{display:flex;align-items:center;gap:5px;padding:5px 10px 5px 8px;border:.5px solid var(--bd);border-radius:20px;background:var(--sur2);cursor:pointer;font-size:12px;color:var(--txm);user-select:none;transition:all .14s}
+.mpill:hover{border-color:var(--bds);background:var(--sur3);color:var(--p)}
+.mdot{width:6px;height:6px;border-radius:50%;background:var(--p);flex-shrink:0}
+.mdot.loc{background:var(--gold)}
+.mopt{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .12s}
+.mopt:hover{background:var(--sur2)}.mopt.sel{background:rgba(42,71,64,.07)}
+.mot-d{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dc{background:var(--p)}.dl{background:var(--gold)}
+.mot-n{font-size:13px;font-weight:500;color:var(--tx);flex:1}
+.mot-s{font-size:11px;color:var(--txs)}
+.mbadge{font-size:9.5px;padding:2px 6px;border-radius:8px;text-transform:uppercase;letter-spacing:.05em}
+.mba{background:rgba(42,71,64,.1);color:var(--p)}.mbl{background:rgba(154,122,70,.12);color:var(--gold)}
+
+.ibtn{width:32px;height:32px;border:.5px solid var(--bd);background:transparent;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--txm);font-size:13px;transition:all .13s}
+.ibtn:hover{background:var(--sur2);color:var(--p)}
+
+/* ─── STEP NAV ─── */
+.steps{display:flex;align-items:center;gap:0;background:var(--sur);border-bottom:.5px solid var(--bd);padding:0 20px;overflow-x:auto;scrollbar-width:none}
+.steps::-webkit-scrollbar{display:none}
+.step{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;color:var(--txs);font-size:13px;transition:all .15s;flex-shrink:0;background:none;border-left:none;border-right:none;border-top:none;font-family:'DM Sans',sans-serif}
+.step.act{color:var(--p);border-bottom-color:var(--p)}
+.step:hover:not(.act){color:var(--txm)}
+.step-num{width:20px;height:20px;border-radius:50%;background:var(--sur2);border:.5px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:500;flex-shrink:0;transition:all .15s}
+.step.act .step-num{background:var(--p);border-color:var(--p);color:white}
+.step.done .step-num{background:rgba(42,71,64,.15);border-color:rgba(42,71,64,.3);color:var(--p)}
+.step.done{color:var(--txm)}
+
+/* ─── MAIN CONTENT ─── */
+.content{flex:1;max-width:680px;width:100%;margin:0 auto;padding:24px 20px 40px}
+
+/* ─── SCREEN ─── */
+.screen{display:none;flex-direction:column;gap:18px;animation:fadeUp .28s ease}
+.screen.act{display:flex}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ─── SECTION TITLE ─── */
+.stitle{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:400;color:var(--p);letter-spacing:-.01em}
+.sdesc{font-size:13px;color:var(--txs);margin-top:3px}
+
+/* ─── CARDS ─── */
+.card{background:var(--sur);border:.5px solid var(--bd);border-radius:var(--rl);overflow:hidden}
+.card-head{padding:14px 18px;border-bottom:.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px}
+.card-hl{display:flex;align-items:center;gap:10px}
+.cdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cg{background:var(--p)}.cgo{background:var(--gold)}.cb{background:#3A6888}.co{background:var(--acc)}
+.cname{font-size:13.5px;font-weight:500;color:var(--tx)}
+.csub{font-size:11px;color:var(--txs);margin-top:1px}
+.card-acts{display:flex;gap:5px;flex-shrink:0}
+.card-body{padding:16px 18px}
+
+/* ─── BUTTONS ─── */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;border-radius:var(--r);font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .16s;border:none}
+.btn-primary{background:var(--p);color:white}
+.btn-primary:hover:not(:disabled){background:var(--pl);transform:translateY(-1px)}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-ghost{background:transparent;color:var(--txm);border:.5px solid var(--bds)}
+.btn-ghost:hover{background:var(--sur2);color:var(--p)}
+.btn-sm{font-size:11.5px;padding:5px 10px;border-radius:8px;border:.5px solid var(--bds);background:transparent;color:var(--txm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+.btn-sm:hover{background:var(--sur2);color:var(--p);border-color:var(--p)}
+.btn-sm.pr{background:var(--p);color:white;border-color:var(--p)}
+.btn-sm.pr:hover{background:var(--pl)}
+.spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:sp .7s linear infinite;display:none;flex-shrink:0}
+.btn.ld .spin{display:block}.btn.ld .bi{display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* ─── TEXTAREA ─── */
+.ta{width:100%;background:var(--bg);border:.5px solid var(--bd);border-radius:var(--r);padding:12px 14px;font-family:'DM Sans',sans-serif;font-size:14px;color:var(--tx);line-height:1.7;resize:vertical;outline:none;transition:border-color .14s}
+.ta:focus{border-color:var(--pl)}.ta::placeholder{color:var(--txs);font-style:italic}
+.fi{width:100%;background:var(--bg);border:.5px solid var(--bd);border-radius:8px;padding:8px 11px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--tx);outline:none;transition:border-color .14s}
+.fi:focus{border-color:var(--pl)}.fi::placeholder{color:var(--txs)}
+select.fi{cursor:pointer;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238A9890' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+
+/* ─── CHIPS ─── */
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-size:12px;padding:4px 11px;border-radius:20px;border:.5px solid var(--bd);background:transparent;color:var(--txm);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+.chip.act,.chip:hover{background:var(--p);color:white;border-color:var(--p)}
+.chip-label{font-size:11.5px;color:var(--txs);white-space:nowrap}
+
+/* ─── INPUT TABS ─── */
+.itabs{display:flex;gap:0;border-bottom:.5px solid var(--bd);margin:-16px -18px 16px}
+.itab{flex:1;padding:10px 8px;font-size:12.5px;color:var(--txs);cursor:pointer;border-bottom:2px solid transparent;transition:all .13s;text-align:center;background:none;border-left:none;border-right:none;border-top:none;font-family:'DM Sans',sans-serif}
+.itab.act{color:var(--p);border-bottom-color:var(--p)}.itab:hover:not(.act){color:var(--txm)}
+
+/* ─── MESSENGER APPS ─── */
+.mapp-row{display:flex;gap:8px;flex-wrap:wrap}
+.mapp{display:flex;align-items:center;gap:5px;padding:6px 12px 6px 9px;border:.5px solid var(--bd);border-radius:20px;background:var(--sur2);cursor:pointer;font-size:12.5px;color:var(--txm);transition:all .13s}
+.mapp:hover{border-color:var(--bds);color:var(--tx)}
+
+/* ─── AUDIO LIST ─── */
+.alist{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.aitem{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--bg);border:.5px solid var(--bd);border-radius:var(--r)}
+.aplay{width:30px;height:30px;border-radius:50%;background:var(--p);border:none;color:white;font-size:10px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .13s}
+.aplay:hover{background:var(--pl)}
+.ainfo{flex:1;min-width:0}
+.aname{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ameta{font-size:11px;color:var(--txs);margin-top:1px}
+.astat{font-size:10.5px;padding:2px 8px;border-radius:10px;flex-shrink:0}
+.sp_{background:var(--sur2);color:var(--txs)}.st_{background:rgba(42,71,64,.1);color:var(--p)}
+.sd_{background:rgba(42,71,64,.12);color:var(--p)}.se_{background:rgba(181,90,44,.1);color:var(--acc)}
+.adel{width:24px;height:24px;background:none;border:none;color:var(--txs);cursor:pointer;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;transition:all .12s;flex-shrink:0}
+.adel:hover{background:var(--sur2);color:var(--acc)}
+.apl-wrap{display:none}
+audio{width:100%;height:28px;margin-top:6px}
+
+/* ─── DROP ZONE ─── */
+.drop{border:1.5px dashed var(--bds);border-radius:var(--r);padding:28px 20px;text-align:center;cursor:pointer;transition:all .16s;background:var(--bg)}
+.drop:hover,.drop.drag{border-color:var(--p);background:rgba(42,71,64,.04)}
+.drop-icon{font-size:28px;opacity:.35;margin-bottom:8px}
+.drop-title{font-size:14px;font-weight:500;color:var(--txm);margin-bottom:3px}
+.drop-sub{font-size:12px;color:var(--txs)}
+
+/* ─── TRANSCRIPT ─── */
+.tr-sec{background:var(--bg);border:.5px solid var(--bd);border-radius:var(--r);padding:12px 14px;margin-top:10px}
+.tr-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--txs)}
+.tr-unc{background:rgba(193,90,40,.12);color:var(--ora);padding:2px 7px;border-radius:8px;font-size:10px;letter-spacing:0;text-transform:none}
+.tr-body{font-size:14px;line-height:2.1;color:var(--tx)}
+.tw{display:inline;cursor:default}
+.tw.u{color:var(--ora);background:rgba(193,90,40,.1);border-radius:3px;padding:0 2px;border-bottom:1.5px solid var(--ora);cursor:pointer}
+.tw.u:hover{background:rgba(193,90,40,.18)}
+.twt{font-size:9.5px;color:var(--txs);margin:0 1px}
+
+/* ─── GFK ROWS ─── */
+.gfk-list{display:flex;flex-direction:column;gap:14px}
+.gfk-row{display:flex;gap:12px}
+.gfk-ico{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:2px}
+.io{background:rgba(42,71,64,.07)}.if_{background:rgba(154,122,70,.1)}.in_{background:rgba(181,90,44,.1)}.ia{background:rgba(58,104,136,.1)}
+.gfk-cat{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--txs);margin-bottom:3px}
+.gfk-txt{font-size:14px;color:var(--tx);line-height:1.65}
+.gfk-sep{height:.5px;background:var(--bd)}
+
+/* ─── TRIGGER ─── */
+.trig-list{display:flex;flex-direction:column;gap:8px}
+.trig-item{padding:10px 12px;border-left:2px solid var(--acc);border-radius:0 8px 8px 0;background:rgba(181,90,44,.04)}
+.trig-p{font-size:12px;font-weight:500;color:var(--acc);font-style:italic;margin-bottom:3px}
+.trig-e{font-size:13px;color:var(--txm);line-height:1.55}
+
+/* ─── TAGS ─── */
+.tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:20px;background:var(--sur2);color:var(--txm);border:.5px solid var(--bd)}
+
+/* ─── TRAINING ─── */
+.train-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:520px){.train-grid{grid-template-columns:1fr}}
+.tcard{background:var(--sur);border:.5px solid var(--bd);border-radius:var(--rl);overflow:hidden}
+.tcard-head{padding:12px 14px;border-bottom:.5px solid var(--bd);font-size:12.5px;font-weight:500;color:var(--tx);display:flex;align-items:center;gap:7px}
+.tcard-body{padding:14px}
+.impact-row{display:flex;gap:9px;padding:8px 0;border-bottom:.5px solid var(--bd)}
+.impact-row:last-child{border-bottom:none;padding-bottom:0}
+.impact-ico{font-size:14px;flex-shrink:0;margin-top:1px}
+.impact-lbl{font-size:10px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--txs);margin-bottom:2px}
+.impact-txt{font-size:12.5px;color:var(--txm);line-height:1.55}
+
+/* Values */
+.val-list{display:flex;flex-direction:column;gap:10px}
+.val-item{}
+.val-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.val-name{font-size:12.5px;font-weight:500;color:var(--txm)}
+.val-shared{font-size:11px;color:var(--txs)}
+.val-bars{display:flex;flex-direction:column;gap:3px}
+.val-bar-wrap{height:6px;background:var(--sur2);border-radius:3px;overflow:hidden}
+.val-bar{height:100%;border-radius:3px;transition:width .7s ease}
+.vbu{background:var(--p)}.vbo{background:var(--gold)}
+.val-legend{display:flex;gap:12px;margin-top:8px}
+.vleg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--txs)}
+.vleg-dot{width:7px;height:7px;border-radius:50%}
+
+/* Align ring */
+.align-row{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.aring{position:relative;width:68px;height:68px;flex-shrink:0}
+.aring svg{transform:rotate(-90deg)}
+.aring-lbl{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.aring-pct{font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:400;color:var(--p)}
+.aring-sub{font-size:8px;color:var(--txs);text-align:center;line-height:1.3}
+.align-info{}
+.align-title{font-size:13.5px;font-weight:500;color:var(--tx);margin-bottom:3px}
+.align-desc{font-size:12.5px;color:var(--txm);line-height:1.55}
+
+/* Alt responses */
+.alt-list{display:flex;flex-direction:column;gap:8px}
+.alt-item{border:.5px solid var(--bd);border-radius:var(--r);overflow:hidden}
+.alt-head{padding:8px 12px;background:var(--sur2);display:flex;align-items:center;justify-content:space-between}
+.alt-strategy{font-size:12px;font-weight:500;color:var(--p)}
+.alt-effect{font-size:11px;color:var(--txs)}
+.alt-body{padding:10px 12px;font-size:13.5px;color:var(--txm);line-height:1.65}
+.alt-foot{padding:0 12px 10px;display:flex;align-items:center;gap:6px}
+.alt-tradeoff{font-size:11px;color:var(--txs);font-style:italic;margin-left:auto}
+
+/* ─── LOADING ─── */
+.lcard{display:none;flex-direction:column;align-items:center;padding:32px;text-align:center;background:var(--sur);border:.5px solid var(--bd);border-radius:var(--rl)}
+.lcard.show{display:flex}
+.ldots{display:flex;gap:5px;margin-bottom:14px}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--p);opacity:.25;animation:lp 1.5s ease-in-out infinite}
+.ldot:nth-child(2){animation-delay:.2s}.ldot:nth-child(3){animation-delay:.4s}
+@keyframes lp{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.1)}}
+.lt{font-family:'Cormorant Garamond',serif;font-size:1.05rem;color:var(--txm);font-style:italic}
+.ls{font-size:12px;color:var(--txs);margin-top:4px}
+.lsm{display:none;align-items:center;gap:8px}
+.lsm.show{display:flex}
+.lsmdots{display:flex;gap:3px}
+.lsmd{width:5px;height:5px;border-radius:50%;background:var(--p);opacity:.25;animation:lp 1.5s ease-in-out infinite}
+.lsmd:nth-child(2){animation-delay:.18s}.lsmd:nth-child(3){animation-delay:.36s}
+.lsmt{font-size:12px;color:var(--txs);font-style:italic}
+
+/* ─── SETTINGS DRAWER ─── */
+.drawer-ov{position:fixed;inset:0;background:rgba(24,40,31,.4);z-index:300;display:none;align-items:flex-end;justify-content:center}
+.drawer-ov.open{display:flex}
+.drawer{background:var(--sur);border-radius:var(--rxl) var(--rxl) 0 0;width:100%;max-width:560px;max-height:90svh;overflow-y:auto;padding:0 0 calc(20px + var(--safe-b));animation:su .22s ease}
+@keyframes su{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.drawer-handle{width:36px;height:4px;border-radius:2px;background:var(--bd);margin:12px auto 0}
+.drawer-title{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:400;color:var(--p);padding:16px 20px 4px}
+.drawer-section{padding:16px 20px 0}
+.drawer-label{font-size:11px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--txs);margin-bottom:8px}
+.drawer-field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field-label{font-size:12px;color:var(--txs)}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:.5px solid var(--bd)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-name{font-size:13.5px;color:var(--txm)}
+/* ─── LANG OPTS ─── */
+.lang-opt{display:flex;align-items:center;gap:7px;padding:8px 10px;border:.5px solid var(--bd);border-radius:var(--r);cursor:pointer;font-size:13px;color:var(--txm);transition:all .13s;user-select:none}
+.lang-opt:hover{border-color:var(--bds);background:var(--sur2);color:var(--tx)}
+.lang-opt.sel{background:rgba(42,71,64,.08);border-color:rgba(42,71,64,.3);color:var(--p);font-weight:500}
+.lang-flag{font-size:14px;line-height:1}
+.lang-pill{display:flex;align-items:center;gap:4px;padding:4px 8px;border:.5px solid var(--bd);border-radius:12px;background:var(--sur2);font-size:11.5px;color:var(--txm);cursor:pointer;transition:all .13s}
+.lang-pill:hover{border-color:var(--bds);color:var(--p)}
+
+.sw{width:38px;height:22px;background:var(--bds);border-radius:11px;position:relative;cursor:pointer;transition:background .18s;flex-shrink:0}
+.sw::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;background:white;border-radius:50%;transition:transform .18s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw.on{background:var(--p)}.sw.on::after{transform:translateX(16px)}
+
+/* ─── SHARE SHEET ─── */
+.share-ov{position:fixed;inset:0;background:rgba(24,40,31,.4);z-index:400;display:none;align-items:flex-end;justify-content:center}
+.share-ov.open{display:flex}
+.share-sheet{background:var(--sur);border-radius:var(--rxl) var(--rxl) 0 0;width:100%;max-width:560px;padding:0 20px calc(24px + var(--safe-b));animation:su .22s ease}
+.share-handle{width:36px;height:4px;border-radius:2px;background:var(--bd);margin:12px auto 8px}
+.share-title{font-family:'Cormorant Garamond',serif;font-size:1.15rem;color:var(--p);margin-bottom:4px}
+.share-preview{background:var(--bg);border:.5px solid var(--bd);border-radius:var(--r);padding:10px 13px;font-size:13.5px;color:var(--txm);line-height:1.65;max-height:100px;overflow-y:auto;margin-bottom:14px}
+.share-apps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.share-app{display:flex;flex-direction:column;align-items:center;gap:5px;padding:12px 8px;border:.5px solid var(--bd);border-radius:var(--r);cursor:pointer;background:var(--sur2);transition:all .13s}
+.share-app:hover{background:var(--sur);border-color:var(--bds)}
+.share-app-icon{font-size:22px;line-height:1}
+.share-app-name{font-size:11px;color:var(--txm);text-align:center}
+.share-row{display:flex;gap:8px}
+
+/* ─── WORD POPUP ─── */
+.wpop{position:fixed;z-index:500;background:var(--sur);border:.5px solid var(--bds);border-radius:var(--rl);padding:14px 16px;width:270px;box-shadow:0 12px 40px rgba(0,0,0,.14);display:none}
+.wpop.open{display:block}
+.wpop-time{font-size:11px;color:var(--txs);margin-bottom:6px}
+.wpop audio{width:100%;height:26px;margin:6px 0}
+.wpop-lbl{font-size:11px;color:var(--txs);margin-bottom:4px}
+.wpop-actions{display:flex;gap:6px;margin-top:8px}
+
+/* ─── TOAST ─── */
+.toast{position:fixed;bottom:calc(24px + var(--safe-b));left:50%;transform:translateX(-50%) translateY(10px);background:var(--p);color:white;padding:9px 18px;border-radius:20px;font-size:13px;font-weight:500;opacity:0;transition:all .22s;z-index:600;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ─── EMPTY STATE ─── */
+.empty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 20px;color:var(--txs)}
+.empty-icon{font-size:36px;opacity:.3;margin-bottom:12px}
+.empty-title{font-size:14px;font-weight:500;color:var(--txm);margin-bottom:5px}
+.empty-sub{font-size:13px}
+
+/* ─── NEXT BUTTON ROW ─── */
+.next-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.next-hint{font-size:12px;color:var(--txs);font-style:italic}
+
+/* ─── DIVIDER ─── */
+.div{height:.5px;background:var(--bd);margin:4px 0}
+
+/* ─── SETTINGS ICON ─── */
+.settings-icon-note{font-size:11.5px;color:var(--txs);text-align:center;padding:6px 0}
+
+/* ─── INSTALL GUIDE ─── */
+.install-method{background:var(--sur2);border-radius:var(--r);padding:12px 14px}
+.install-method-title{font-size:13.5px;font-weight:500;color:var(--tx);margin-bottom:8px}
+.install-steps{display:flex;flex-direction:column;gap:6px}
+.istep{display:flex;align-items:flex-start;gap:9px;font-size:13px;color:var(--txm);line-height:1.5}
+.istep-n{width:20px;height:20px;border-radius:50%;background:var(--p);color:white;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+
+/* ─── INSTALL BANNER ─── */
+.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:linear-gradient(135deg,#2A4740,#38594F);color:white;font-size:13px;animation:slideDown .35s ease}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.install-bar.show{display:flex}
+.install-bar-text{display:flex;align-items:center;gap:8px}
+.install-bar-acts{display:flex;gap:6px;flex-shrink:0}
+.install-btn{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border:none}
+.install-btn-yes{background:white;color:var(--p)}
+.install-btn-no{background:transparent;color:rgba(255,255,255,.6);border:.5px solid rgba(255,255,255,.3)}
+
+/* ─── JOURNAL ─── */
+.jfilter{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.jfilter .chip{font-size:11.5px}
+.jcount{font-size:12px;color:var(--txs);margin-left:auto}
+.jlist{display:flex;flex-direction:column;gap:10px}
+.jentry{background:var(--sur);border:.5px solid var(--bd);border-radius:var(--rl);overflow:hidden;transition:box-shadow .15s}
+.jentry:hover{box-shadow:0 2px 12px rgba(42,71,64,.08)}
+.jentry-head{padding:13px 16px;display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.jentry-meta{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+.jentry-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.jentry-date{font-size:11.5px;color:var(--txs)}
+.jsrc-chip{font-size:10.5px;padding:2px 8px;border-radius:10px;background:rgba(42,71,64,.08);color:var(--p);border:.5px solid rgba(42,71,64,.15)}
+.jentry-feeling{font-size:13px;color:var(--txm);line-height:1.5;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jentry-feeling em{font-style:normal;color:var(--p);font-weight:500}
+.jentry-preview{font-size:12px;color:var(--txs);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px}
+.jentry-arrow{font-size:11px;color:var(--txs);transition:transform .2s;flex-shrink:0;margin-top:2px}
+.jentry.open .jentry-arrow{transform:rotate(90deg)}
+.jentry-acts{display:flex;gap:6px;flex-shrink:0}
+.jentry-body{display:none;padding:0 16px 14px;animation:fadeUp .2s ease}
+.jentry.open .jentry-body{display:block}
+.jentry-section{margin-top:10px}
+.js-label{font-size:10px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--txs);margin-bottom:4px}
+.js-text{font-size:13.5px;color:var(--txm);line-height:1.65}
+.jentry-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.jtag{font-size:11px;padding:2px 8px;border-radius:10px;background:var(--sur2);color:var(--txs);border:.5px solid var(--bd)}
+.jentry-resp{font-size:13px;color:var(--txm);line-height:1.65;padding:10px 12px;background:rgba(42,71,64,.04);border-left:2px solid var(--p);border-radius:0 8px 8px 0;margin-top:6px}
+.jdel{font-size:11px;color:var(--txs);background:none;border:none;cursor:pointer;padding:3px 6px;border-radius:5px;font-family:'DM Sans',sans-serif;transition:all .12s}
+.jdel:hover{background:rgba(181,90,44,.1);color:var(--acc)}
+.jempty{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 20px;color:var(--txs)}
+.jempty-icon{font-size:40px;opacity:.25;margin-bottom:12px}
+.jempty-t{font-size:14px;font-weight:500;color:var(--txm);margin-bottom:6px}
+.jempty-s{font-size:13px;line-height:1.6}
+
+/* ─── TRENDS ─── */
+.trends{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.trend-card{background:var(--sur);border:.5px solid var(--bd);border-radius:var(--r);padding:12px;text-align:center}
+.trend-n{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:300;color:var(--p);line-height:1}
+.trend-l{font-size:10.5px;color:var(--txs);margin-top:3px}
+/* ─── ERROR CARD ─── */
+.err-card{background:rgba(181,90,44,.06);border:.5px solid rgba(181,90,44,.28);border-radius:var(--rl);padding:14px 16px;display:flex;align-items:flex-start;gap:10px;animation:fadeUp .25s ease}
+.err-icon{font-size:20px;flex-shrink:0;line-height:1.2}
+.err-title{font-size:13.5px;font-weight:500;color:var(--acc);margin-bottom:3px}
+.err-msg{font-size:12.5px;color:var(--txm);line-height:1.55}
+.err-actions{display:flex;gap:7px;margin-top:9px;flex-wrap:wrap}
+.err-btn{padding:5px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-family:inherit;transition:all .13s}
+.err-btn.pri{background:var(--acc);color:white;border:.5px solid var(--acc)}
+.err-btn.sec{background:transparent;color:var(--txm);border:.5px solid var(--bds)}
+.err-btn:hover{opacity:.85}
+
+/* ─── RESET BUTTON ─── */
+.reset-fab{position:fixed;bottom:calc(24px + var(--safe-b));right:20px;width:44px;height:44px;border-radius:50%;background:var(--sur);border:.5px solid var(--bds);display:none;align-items:center;justify-content:center;font-size:16px;cursor:pointer;z-index:50;box-shadow:0 2px 12px rgba(42,71,64,.15);color:var(--txm);transition:all .15s}
+.reset-fab:hover{background:var(--sur2);color:var(--p);transform:rotate(-20deg)}
+.reset-fab.show{display:flex}
+
+/* ─── MESSENGER ICONS ─── */
+.mapp-row{display:flex;gap:8px;flex-wrap:wrap}
+.mapp{display:flex;align-items:center;gap:6px;padding:7px 13px 7px 10px;border:.5px solid var(--bd);border-radius:20px;background:var(--sur);cursor:pointer;font-size:12.5px;color:var(--txm);transition:all .13s;user-select:none}
+.mapp:hover{border-color:var(--bds);color:var(--tx);background:var(--sur2)}
+.mapp svg{width:15px;height:15px;flex-shrink:0}
+
+/* ─── MAP SCREEN ─── */
+#map-canvas{display:block;width:100%;touch-action:none;cursor:default;border-radius:var(--rl);border:.5px solid var(--bd)}
+.map-wrap{position:relative;width:100%}
+.map-detail{position:absolute;top:10px;right:10px;width:195px;background:var(--sur);border:.5px solid var(--bds);border-radius:var(--rl);padding:13px 14px;font-size:13px;display:none;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.map-add-panel{position:absolute;top:10px;left:10px;width:200px;background:var(--sur);border:.5px solid var(--bds);border-radius:var(--rl);padding:13px 14px;display:none;flex-direction:column;gap:8px;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.map-legend{position:absolute;bottom:10px;right:10px;background:var(--sur);border:.5px solid var(--bd);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.mleg-row{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--txs)}
+.mleg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.map-add-btn{position:absolute;bottom:10px;left:10px;padding:6px 13px;border-radius:20px;border:.5px solid var(--bds);background:var(--sur);color:var(--txm);font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .13s}
+.map-add-btn:hover{border-color:var(--p);color:var(--p)}
+.map-dp-lbl{font-size:10px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--txs);margin-top:8px;margin-bottom:2px}
+.map-bar{height:5px;background:var(--sur2);border-radius:3px;margin-top:3px;overflow:hidden}
+.map-bar-fill{height:100%;border-radius:3px}
+.map-actions{display:flex;gap:5px;margin-top:10px}
+.map-btn{flex:1;padding:5px 6px;border-radius:6px;border:.5px solid var(--bds);background:transparent;color:var(--txm);font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+.map-btn:hover{background:var(--sur2);color:var(--p)}
+.map-btn.del:hover{border-color:var(--acc);color:var(--acc)}
+.map-insight{background:rgba(42,71,64,.04);border:.5px solid rgba(42,71,64,.12);border-radius:var(--r);padding:10px 12px;font-size:12.5px;color:var(--txm);line-height:1.6}
+.map-insight strong{font-weight:500;color:var(--p)}
+.mlbl{font-size:11px;color:var(--txs);margin-bottom:2px;display:block}
+</style>
+</head>
+<body>
+
+<!-- Word popup -->
+<div class="wpop" id="wpop">
+  <div class="wpop-time" id="wpop-time">⏱ 0:00</div>
+  <audio id="wpop-aud" controls></audio>
+  <div class="wpop-lbl">Wort korrigieren:</div>
+  <input class="fi" id="wpop-in" type="text" placeholder="Richtiges Wort">
+  <div class="wpop-actions">
+    <button class="btn btn-primary" style="flex:1;padding:7px 12px;font-size:13px" onclick="applyFix()">✓ Übernehmen</button>
+    <button class="btn btn-ghost" style="padding:7px 12px;font-size:13px" onclick="closePop()">✕</button>
+  </div>
+</div>
+
+<!-- Share sheet -->
+<div class="share-ov" id="shareOv" onclick="if(event.target===this)closeShare()">
+  <div class="share-sheet">
+    <div class="share-handle"></div>
+    <div class="share-title">Teilen via</div>
+    <div class="share-preview" id="share-txt"></div>
+    <div class="share-apps">
+      <div class="share-app" onclick="svia('whatsapp')"><div class="share-app-icon">💬</div><div class="share-app-name">WhatsApp</div></div>
+      <div class="share-app" onclick="svia('telegram')"><div class="share-app-icon">✈</div><div class="share-app-name">Telegram</div></div>
+      <div class="share-app" onclick="svia('signal')"><div class="share-app-icon">🔒</div><div class="share-app-name">Signal</div></div>
+      <div class="share-app" onclick="svia('sms')"><div class="share-app-icon">✉</div><div class="share-app-name">SMS</div></div>
+      <div class="share-app" onclick="svia('mail')"><div class="share-app-icon">📧</div><div class="share-app-name">E-Mail</div></div>
+      <div class="share-app" onclick="svia('dating')"><div class="share-app-icon">🔥</div><div class="share-app-name">Dating</div></div>
+      <div class="share-app" onclick="svia('ig')"><div class="share-app-icon">◈</div><div class="share-app-name">Instagram</div></div>
+      <div class="share-app" onclick="svNative()"><div class="share-app-icon">⊕</div><div class="share-app-name">Andere</div></div>
+    </div>
+    <div class="share-row">
+      <button class="btn btn-ghost" style="flex:1" onclick="copyShare()">⊡ Kopieren</button>
+      <button class="btn btn-primary" onclick="closeShare()">Fertig</button>
+    </div>
+  </div>
+</div>
+
+<!-- Install guide drawer -->
+<div class="drawer-ov" id="installGuideOv" onclick="if(event.target===this)document.getElementById('installGuideOv').classList.remove('open')">
+  <div class="drawer" style="max-height:80svh">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title">App installieren</div>
+    <div style="padding:0 20px 20px;display:flex;flex-direction:column;gap:16px">
+
+      <div style="font-size:13px;color:var(--txm);line-height:1.65">
+        Nach der Installation erscheint Resonanz im <strong>Teilen-Menü</strong> von WhatsApp, Signal und anderen Apps.
+      </div>
+
+      <!-- Chrome / Samsung Internet -->
+      <div class="install-method" id="method-chrome">
+        <div class="install-method-title">🟢 Chrome oder Samsung Internet</div>
+        <div class="install-steps">
+          <div class="istep"><span class="istep-n">1</span>Tippe oben rechts auf die <strong>drei Punkte ⋮</strong></div>
+          <div class="istep"><span class="istep-n">2</span>Tippe auf <strong>„App installieren"</strong> oder <strong>„Zum Startbildschirm"</strong></div>
+          <div class="istep"><span class="istep-n">3</span>Bestätige mit <strong>„Installieren"</strong></div>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="doInstall()">
+          Jetzt installieren (Chrome)
+        </button>
+      </div>
+
+      <!-- Brave -->
+      <div class="install-method">
+        <div class="install-method-title">🦁 Brave Browser</div>
+        <div class="install-steps">
+          <div class="istep"><span class="istep-n">1</span>Tippe unten rechts auf das <strong>Brave-Menü (drei Striche)</strong></div>
+          <div class="istep"><span class="istep-n">2</span>Tippe auf <strong>„Zum Startbildschirm hinzufügen"</strong></div>
+          <div class="istep"><span class="istep-n">3</span>Bestätige — fertig</div>
+        </div>
+        <div style="font-size:11.5px;color:var(--txs);margin-top:6px">Brave blockiert den automatischen Install-Dialog — daher manuell.</div>
+      </div>
+
+      <!-- Firefox -->
+      <div class="install-method">
+        <div class="install-method-title">🦊 Firefox</div>
+        <div class="install-steps">
+          <div class="istep"><span class="istep-n">1</span>Tippe auf die <strong>drei Punkte ⋮</strong></div>
+          <div class="istep"><span class="istep-n">2</span>Tippe auf <strong>„Zum Startbildschirm hinzufügen"</strong></div>
+        </div>
+      </div>
+
+      <!-- iPhone Safari -->
+      <div class="install-method">
+        <div class="install-method-title">🍎 iPhone — Safari</div>
+        <div class="install-steps">
+          <div class="istep"><span class="istep-n">1</span>Öffne die App in <strong>Safari</strong> (nicht Chrome/Brave)</div>
+          <div class="istep"><span class="istep-n">2</span>Tippe unten auf das <strong>Teilen-Symbol ⬆</strong></div>
+          <div class="istep"><span class="istep-n">3</span>Wähle <strong>„Zum Home-Bildschirm"</strong></div>
+        </div>
+        <div style="font-size:11.5px;color:var(--txs);margin-top:6px">Nur Safari unterstützt PWA-Installation auf iPhone.</div>
+      </div>
+
+      <div style="font-size:12px;color:var(--txs);padding:10px 12px;background:rgba(42,71,64,.05);border-radius:var(--r);line-height:1.6">
+        💡 Nach der Installation Handy neu starten — dann erscheint Resonanz im Teilen-Menü von WhatsApp.
+      </div>
+
+      <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('installGuideOv').classList.remove('open')">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings drawer -->
+<div class="drawer-ov" id="settingsOv" onclick="if(event.target===this)closeSettings()">
+  <div class="drawer">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title">Einstellungen</div>
+
+    <div class="drawer-section">
+      <div class="drawer-label">KI-Modell</div>
+      <div style="display:flex;flex-direction:column;gap:6px" id="model-opts">
+        <div class="mopt sel" onclick="pickModel(this,'claude','Claude Sonnet','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r);background:rgba(42,71,64,.06)">
+          <div class="mot-d dc"></div>
+          <div style="flex:1"><div class="mot-n">Claude Sonnet</div><div class="mot-s">Anthropic · beste Empathie</div></div>
+          <span class="mbadge mba">API</span>
+        </div>
+        <div class="mopt" onclick="pickModel(this,'gpt4','GPT-4o','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
+          <div class="mot-d dc"></div>
+          <div style="flex:1"><div class="mot-n">GPT-4o</div><div class="mot-s">OpenAI · sehr präzise</div></div>
+          <span class="mbadge mba">API</span>
+        </div>
+        <div class="mopt" onclick="pickModel(this,'llama','Llama 3.2','local')" style="border:.5px solid var(--bd);border-radius:var(--r)">
+          <div class="mot-d dl"></div>
+          <div style="flex:1"><div class="mot-n">Llama 3.2</div><div class="mot-s">Ollama · lokal · 100% privat</div></div>
+          <span class="mbadge mbl">Lokal</span>
+        </div>
+        <div class="mopt" onclick="pickModel(this,'mistral','Mistral 7B','local')" style="border:.5px solid var(--bd);border-radius:var(--r)">
+          <div class="mot-d dl"></div>
+          <div style="flex:1"><div class="mot-n">Mistral 7B</div><div class="mot-s">Ollama · lokal · 100% privat</div></div>
+          <span class="mbadge mbl">Lokal</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-label">API-Schlüssel</div>
+
+      <!-- Saved indicator -->
+      <div id="keys-saved-bar" style="display:none;align-items:center;gap:8px;padding:9px 12px;background:rgba(74,155,127,.1);border:.5px solid rgba(74,155,127,.3);border-radius:var(--r);margin-bottom:10px">
+        <span style="font-size:14px">🔐</span>
+        <div style="flex:1;font-size:12.5px;color:var(--p)">Keys gespeichert — automatisch geladen</div>
+        <button onclick="clearSavedKeys()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:.5px solid rgba(181,90,44,.3);background:transparent;color:var(--acc);cursor:pointer;font-family:inherit">Löschen</button>
+      </div>
+
+      <div class="drawer-field" id="key-claude">
+        <div class="field-label">Anthropic (Claude) <a href="https://console.anthropic.com" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
+        <input class="fi" type="password" id="ckey" placeholder="sk-ant-api03-…" autocomplete="off" oninput="updateKeyStatus('claude',this.value)">
+        <div style="font-size:11px;margin-top:3px" id="key-status-claude"></div>
+      </div>
+      <div class="drawer-field" id="key-openai" style="display:none">
+        <div class="field-label">OpenAI (GPT-4o) <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
+        <input class="fi" type="password" id="okey" placeholder="sk-proj-…" autocomplete="off" oninput="updateKeyStatus('openai',this.value)">
+        <div style="font-size:11px;margin-top:3px" id="key-status-openai"></div>
+      </div>
+      <div class="drawer-field" id="key-ollama" style="display:none">
+        <div class="field-label">Ollama URL</div>
+        <input class="fi" type="text" id="olurl" value="http://localhost:11434">
+      </div>
+
+      <!-- PIN + Save -->
+      <div id="key-save-row" style="margin-top:8px">
+        <div class="field-label" style="margin-bottom:5px">4-stellige PIN zum Schutz deiner Keys</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="fi" type="password" id="keyPin" placeholder="z. B. 1234" maxlength="4" inputmode="numeric" style="width:100px;text-align:center;letter-spacing:6px;font-size:16px">
+          <button onclick="saveKeys()" style="flex:1;padding:8px 12px;border-radius:var(--r);border:none;background:var(--p);color:white;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">🔒 Keys speichern</button>
+        </div>
+        <div style="font-size:11px;color:var(--txs);margin-top:5px">Pin wird nicht gespeichert — nur du kennst ihn · Keys bleiben lokal auf diesem Gerät</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-label">Audio-Transkription</div>
+      <div class="drawer-field">
+        <div class="field-label">Sprache der Sprachnachrichten</div>
+        <select class="fi" id="wlang">
+          <option value="de">Deutsch</option>
+          <option value="en">Englisch</option>
+          <option value="tr">Türkisch</option>
+          <option value="ar">Arabisch</option>
+          <option value="ru">Russisch</option>
+          <option value="es">Spanisch</option>
+          <option value="fr">Französisch</option>
+          <option value="it">Italienisch</option>
+          <option value="auto">Automatisch erkennen</option>
+        </select>
+        <div style="font-size:11px;color:var(--txs);margin-top:4px">Transkription läuft über deinen Backend-Server — kein separater Whisper-Key nötig.</div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-label">Ausgabe-Module</div>
+      <div id="toggle-list">
+        <div class="toggle-row">
+          <span class="toggle-name">GFK für mich selbst</span>
+          <div class="sw on" id="tsw-self" onclick="toggleSw(this,'self')"></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-name">GFK-Antwort an andere Person</span>
+          <div class="sw on" id="tsw-resp" onclick="toggleSw(this,'resp')"></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-name">Neutrale Zusammenfassung</span>
+          <div class="sw on" id="tsw-sum" onclick="toggleSw(this,'sum')"></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-name">Trigger-Analyse</span>
+          <div class="sw on" id="tsw-trig" onclick="toggleSw(this,'trig')"></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-name">Kommunikations-Training</span>
+          <div class="sw on" id="tsw-train" onclick="toggleSw(this,'train')"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-label">Ausgabe-Sprache</div>
+      <div style="font-size:12px;color:var(--txs);margin-bottom:8px">Egal in welcher Sprache die Eingabe ist — die Analyse erscheint in dieser Sprache</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="lang-opts">
+        <div class="lang-opt sel" onclick="pickLang(this,'de','Deutsch')"><span class="lang-flag">🇩🇪</span> Deutsch</div>
+        <div class="lang-opt" onclick="pickLang(this,'en','English')"><span class="lang-flag">🇬🇧</span> English</div>
+        <div class="lang-opt" onclick="pickLang(this,'es','Español')"><span class="lang-flag">🇪🇸</span> Español</div>
+        <div class="lang-opt" onclick="pickLang(this,'fr','Français')"><span class="lang-flag">🇫🇷</span> Français</div>
+        <div class="lang-opt" onclick="pickLang(this,'it','Italiano')"><span class="lang-flag">🇮🇹</span> Italiano</div>
+        <div class="lang-opt" onclick="pickLang(this,'tr','Türkçe')"><span class="lang-flag">🇹🇷</span> Türkçe</div>
+        <div class="lang-opt" onclick="pickLang(this,'ar','العربية')"><span class="lang-flag">🇸🇦</span> العربية</div>
+        <div class="lang-opt" onclick="pickLang(this,'ru','Русский')"><span class="lang-flag">🇷🇺</span> Русский</div>
+        <div class="lang-opt" onclick="pickLang(this,'zh','中文')"><span class="lang-flag">🇨🇳</span> 中文</div>
+        <div class="lang-opt" onclick="pickLang(this,'ja','日本語')"><span class="lang-flag">🇯🇵</span> 日本語</div>
+        <div class="lang-opt" onclick="pickLang(this,'pt','Português')"><span class="lang-flag">🇧🇷</span> Português</div>
+        <div class="lang-opt" onclick="pickLang(this,'nl','Nederlands')"><span class="lang-flag">🇳🇱</span> Nederlands</div>
+      </div>
+    </div>
+
+    <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:8px">
+      <button class="btn btn-ghost" style="width:100%" onclick="closeSettings()">Fertig</button>
+      <div style="display:flex;justify-content:center;gap:16px;padding-top:4px">
+        <a href="https://resonanz.chat" style="font-size:11.5px;color:var(--txs);text-decoration:none">Über Resonanz</a>
+        <a href="./impressum.html" style="font-size:11.5px;color:var(--txs);text-decoration:none">Impressum</a>
+        <a href="./datenschutz.html" style="font-size:11.5px;color:var(--txs);text-decoration:none">Datenschutz</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- Reset FAB -->
+  <button class="reset-fab" id="resetFab" onclick="fullReset()" title="Alles zurücksetzen">↺</button>
+  <!-- Install banner (auto, Chrome only) -->
+  <div class="install-bar" id="installBar">
+    <div class="install-bar-text">
+      <span style="font-size:20px">📲</span>
+      <span><strong>Resonanz installieren</strong> — für WhatsApp-Teilen-Integration</span>
+    </div>
+    <div class="install-bar-acts">
+      <button class="install-btn install-btn-yes" onclick="doInstall()">Installieren</button>
+      <button class="install-btn install-btn-no" onclick="dismissInstall()">Später</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-brand">Resonanz</div>
+    <div class="hdr-right">
+      <div class="mpill" id="mpill" onclick="openSettings()" title="KI-Modell wechseln" style="cursor:pointer">
+        <div class="mdot" id="pdot"></div>
+        <span id="plbl">Claude Sonnet</span>
+      </div>
+      <div class="lang-pill" id="langPill" onclick="openSettings()" title="Ausgabe-Sprache ändern">
+        <span id="langFlag">🇩🇪</span>
+        <span id="langName">DE</span>
+      </div>
+      <button class="ibtn" id="installBtn" onclick="showInstallGuide()" title="App installieren" style="display:none">📲</button>
+      <button class="ibtn" onclick="openSettings()" title="Einstellungen">⚙</button>
+    </div>
+  </div>
+
+  <!-- Step nav -->
+  <div class="steps">
+    <button class="step act" id="step-1" onclick="goStep(1)"><div class="step-num">1</div>Eingabe</button>
+    <button class="step" id="step-2" onclick="goStep(2)"><div class="step-num">2</div>Analyse</button>
+    <button class="step" id="step-3" onclick="goStep(3)"><div class="step-num">3</div>Training</button>
+    <button class="step" id="step-4" onclick="goStep(4)"><div class="step-num">◎</div>Verlauf</button>
+    <button class="step" id="step-5" onclick="goStep(5)"><div class="step-num">◈</div>Karte</button>
+  </div>
+
+  <!-- Screens -->
+  <div class="content">
+
+    <!-- ── STEP 1: INPUT ── -->
+    <div class="screen act" id="screen-1">
+      <div>
+        <div class="stitle">Nachricht eingeben</div>
+        <div class="sdesc">Text, Audio oder Chat-Export — alles was du verarbeiten möchtest</div>
+      </div>
+
+      <!-- Context FIRST -->
+      <div>
+        <div style="font-size:12px;color:var(--txs);margin-bottom:6px">Kontext (optional) — hilft der KI besser zu verstehen:</div>
+        <textarea class="ta" id="ctxIn" rows="2" placeholder="z. B. »Mutter · angespannte Beziehung · Thema Geld · Angst vor Ablehnung«" style="min-height:60px;resize:none"></textarea>
+      </div>
+
+      <!-- Source -->
+      <div>
+        <div style="font-size:12px;color:var(--txs);margin-bottom:7px">Diese Nachricht kommt von:</div>
+        <div class="chips">
+          <button class="chip act" onclick="setSrc(this,'partner')">Partner·in</button>
+          <button class="chip" onclick="setSrc(this,'mother')">Mutter</button>
+          <button class="chip" onclick="setSrc(this,'father')">Vater</button>
+          <button class="chip" onclick="setSrc(this,'friend')">Freund·in</button>
+          <button class="chip" onclick="setSrc(this,'colleague')">Kolleg·in</button>
+          <button class="chip" onclick="setSrc(this,'other')">Andere</button>
+        </div>
+      </div>
+
+      <!-- Input card -->
+      <div class="card">
+        <div class="card-body">
+          <div class="itabs">
+            <button class="itab act" onclick="switchITab('text',this)">✦ Text</button>
+            <button class="itab" onclick="switchITab('audio',this)">◎ Audio</button>
+            <button class="itab" onclick="switchITab('chat',this)">⊞ Chat</button>
+          </div>
+
+          <!-- Text -->
+          <div id="itab-text">
+            <textarea class="ta" id="msgIn" rows="6" placeholder="Nachricht hier einfügen …&#10;&#10;Aus WhatsApp, Telegram, Signal, Dating-App, E-Mail kopieren — oder per Teilen-Funktion senden."></textarea>
+          </div>
+
+          <!-- Audio -->
+          <div id="itab-audio" style="display:none">
+            <div class="drop" id="adrop" onclick="document.getElementById('aIn').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="doDrop(event)">
+              <div class="drop-icon">🎙</div>
+              <div class="drop-title">Audionachrichten auswählen</div>
+              <div class="drop-sub">Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG, OPUS · beliebige Länge</div>
+            </div>
+            <input type="file" id="aIn" accept="audio/*" multiple onchange="addFiles(this.files)" style="display:none">
+            <div class="alist" id="alist"></div>
+            <div id="transcribe-action" style="display:none;margin-top:10px;align-items:center;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-ghost" id="transcribeBtn" onclick="transcribeAll()" style="font-size:13px;padding:8px 16px">
+                <span class="bi">🎙 Jetzt transkribieren</span><div class="spin"></div>
+              </button>
+              <span style="font-size:12px;color:var(--txs)" id="transcribe-hint">Transkript erscheint nach jeder Datei</span>
+            </div>
+            <div id="trArea"></div>
+          </div>
+
+          <!-- Chat -->
+          <div id="itab-chat" style="display:none">
+            <textarea class="ta" id="chatIn" rows="7" placeholder="WhatsApp/Telegram Chat-Export:&#10;&#10;[22.03.25, 14:32] Anna: Heute mal wieder kein Lebenszeichen …&#10;[22.03.25, 14:35] Ich: Sorry, war im Meeting"></textarea>
+            <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+              <button class="btn btn-ghost" style="font-size:12.5px;padding:7px 14px" onclick="document.getElementById('chatFile').click()">📎 .txt laden</button>
+              <input type="file" id="chatFile" accept=".txt" style="display:none" onchange="loadChat(this)">
+              <span style="font-size:11.5px;color:var(--txs)">WhatsApp → Mehr → Chat exportieren</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messenger from -->
+      <div id="share-from-section">
+        <div style="font-size:12px;color:var(--txs);margin-bottom:8px" id="share-from-label">Direkt aus App teilen:</div>
+        <div class="mapp-row" id="mapp-row">
+          <div class="mapp" onclick="handleMessengerShare('whatsapp')">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" fill="#25D366"/><path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.985-1.306A9.953 9.953 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" stroke="#25D366" stroke-width="1.5" fill="none"/></svg>
+            WhatsApp
+          </div>
+          <div class="mapp" onclick="handleMessengerShare('telegram')">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M21.198 2.433a2.242 2.242 0 00-1.022.215l-16.5 6.667c-.97.392-.963 1.516-.033 1.878l4.08 1.519 1.568 4.883c.192.6.922.822 1.396.436l2.265-1.872 4.34 3.17c.748.547 1.792.19 2.043-.675l3.16-14.174c.258-1.157-.771-2.115-1.297-2.047zM9.5 15.5l-.5 3-1.5-4.5 9-5.5-7 7z" fill="#0088cc"/></svg>
+            Telegram
+          </div>
+          <div class="mapp" onclick="handleMessengerShare('signal')">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2zm0 3a2 2 0 110 4 2 2 0 010-4zm0 5.5c2.209 0 4 1.567 4 3.5v.5H8v-.5c0-1.933 1.791-3.5 4-3.5z" fill="#3A76F0"/></svg>
+            Signal
+          </div>
+          <div class="mapp" onclick="handleMessengerShare('imessage')">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M20 2H4C2.897 2 2 2.897 2 4v18l4-4h14c1.103 0 2-.897 2-2V4c0-1.103-.897-2-2-2zm-7 11H7v-2h6v2zm4-4H7V7h10v2z" fill="#34C759"/></svg>
+            iMessage
+          </div>
+        </div>
+        <div id="share-install-hint" style="font-size:11px;color:var(--txs);margin-top:7px;display:none">
+          ↑ App auf Homescreen installieren damit diese Buttons im Teilen-Menü erscheinen
+        </div>
+      </div>
+
+      <!-- Action -->
+      <div class="next-row">
+        <button class="btn btn-primary" id="analyseBtn" onclick="runAnalysis()">
+          <span class="bi">✦</span><div class="spin"></div>
+          GFK-Analyse starten
+        </button>
+        <span class="next-hint">Beobachtung · Gefühl · Bedürfnis · Bitte</span>
+      </div>
+
+      <div class="lcard" id="lcard-1">
+        <div class="ldots"><div class="ldot"></div><div class="ldot"></div><div class="ldot"></div></div>
+        <div class="lt" id="lt1">Höre mit dem Herzen zu …</div>
+        <div class="ls" id="ls1">Erkenne Beobachtungen, Gefühle und Bedürfnisse</div>
+      </div>
+    </div>
+
+    <!-- ── STEP 2: ANALYSIS ── -->
+    <div class="screen" id="screen-2">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div>
+          <div class="stitle">GFK-Analyse</div>
+          <div class="sdesc" id="analysis-src-label">Empfangen von Partner·in</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" onclick="copyAll()">⊡ Alle</button>
+          <button class="btn-sm" onclick="newAnalysis()">↺ Neu</button>
+        </div>
+      </div>
+
+      <!-- GFK Self -->
+      <div class="card" id="rc-self">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot cg"></div><div><div class="cname">Für mich — was löst das aus?</div><div class="csub">Selbstempathie</div></div></div>
+          <div class="card-acts"><button class="btn-sm" onclick="copyCard('self')">Kopieren</button></div>
+        </div>
+        <div class="card-body"><div class="gfk-list" id="gSelf"></div></div>
+      </div>
+
+      <!-- GFK Response -->
+      <div class="card" id="rc-resp">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot cgo"></div><div><div class="cname">GFK-Antwort an die andere Person</div><div class="csub">Mit Mitgefühl antworten</div></div></div>
+          <div class="card-acts">
+            <button class="btn-sm" onclick="copyCard('resp')">Kopieren</button>
+            <button class="btn-sm pr" onclick="openShare(document.getElementById('gResp').textContent)">↗ Teilen</button>
+          </div>
+        </div>
+        <div class="card-body"><div id="gResp" style="font-size:14px;line-height:1.75;color:var(--txm)"></div></div>
+      </div>
+
+      <!-- Summary -->
+      <div class="card" id="rc-sum">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot cb"></div><div><div class="cname">Neutrale Zusammenfassung</div><div class="csub">Was wurde sachlich gesagt?</div></div></div>
+          <div class="card-acts"><button class="btn-sm" onclick="copyCard('sum')">Kopieren</button></div>
+        </div>
+        <div class="card-body">
+          <div id="gSum" style="font-size:14px;line-height:1.75;color:var(--txm)"></div>
+          <div class="tags" id="gTags"></div>
+        </div>
+      </div>
+
+      <!-- Triggers -->
+      <div class="card" id="rc-trig">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot co"></div><div><div class="cname">Trigger-Analyse</div><div class="csub">Muster und Wunden erkennen</div></div></div>
+        </div>
+        <div class="card-body"><div class="trig-list" id="gTrig"></div></div>
+      </div>
+
+      <!-- Next step hint -->
+      <div class="card" id="rc-train-hint" style="background:rgba(42,71,64,.04);border-color:rgba(42,71,64,.15)">
+        <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <div>
+            <div style="font-size:13.5px;font-weight:500;color:var(--p)">Wie möchtest du antworten?</div>
+            <div style="font-size:12px;color:var(--txs);margin-top:2px">Schreib deine spontane Antwort — dann analysieren wir sie</div>
+          </div>
+          <button class="btn btn-primary" style="padding:9px 16px;font-size:13px;white-space:nowrap" onclick="goStep(3)">Training →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 3: TRAINING ── -->
+    <div class="screen" id="screen-3">
+      <div>
+        <div class="stitle">Kommunikations-Training</div>
+        <div class="sdesc">Schreib deine spontane Antwort — ehrlich, ohne Filter</div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <textarea class="ta" id="userResp" rows="5" placeholder="Was würdest du wirklich antworten? Schreib es einfach so, wie es dir gerade kommt — wir analysieren gemeinsam, was es zeigt …"></textarea>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="trainBtn" onclick="runTraining()">
+              <span class="bi">◎</span><div class="spin"></div>
+              Antwort analysieren
+            </button>
+            <div class="lsm" id="lsm-train">
+              <div class="lsmdots"><div class="lsmd"></div><div class="lsmd"></div><div class="lsmd"></div></div>
+              <span class="lsmt">Analysiere …</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Training results (hidden until analyzed) -->
+      <div id="trainResults" style="display:none;flex-direction:column;gap:14px">
+
+        <div class="train-grid">
+          <div class="tcard">
+            <div class="tcard-head">🪞 Was deine Antwort zeigt</div>
+            <div class="tcard-body"><div id="tr-self"></div></div>
+          </div>
+          <div class="tcard">
+            <div class="tcard-head">👁 Wie es ankommt</div>
+            <div class="tcard-body"><div id="tr-recv"></div></div>
+          </div>
+        </div>
+
+        <!-- Values compass -->
+        <div class="card">
+          <div class="card-head"><div class="card-hl"><div class="cdot cg"></div><div><div class="cname">Werte-Kompass</div><div class="csub">Wo ihr euch trefft — und wo nicht</div></div></div></div>
+          <div class="card-body">
+            <div class="align-row">
+              <div class="aring">
+                <svg width="68" height="68" viewBox="0 0 68 68">
+                  <circle cx="34" cy="34" r="26" fill="none" stroke="var(--sur2)" stroke-width="7"/>
+                  <circle id="aCircle" cx="34" cy="34" r="26" fill="none" stroke="var(--p)" stroke-width="7" stroke-dasharray="163" stroke-dashoffset="163" style="transition:stroke-dashoffset .8s ease"/>
+                </svg>
+                <div class="aring-lbl"><div class="aring-pct" id="aPct">0%</div><div class="aring-sub">Werte<br>Resonanz</div></div>
+              </div>
+              <div class="align-info">
+                <div class="align-title" id="aTitle">–</div>
+                <div class="align-desc" id="aDesc"></div>
+              </div>
+            </div>
+            <div class="val-list" id="val-list"></div>
+            <div class="val-legend" style="margin-top:8px">
+              <div class="vleg"><div class="vleg-dot" style="background:var(--p)"></div>Deine Werte</div>
+              <div class="vleg"><div class="vleg-dot" style="background:var(--gold)"></div>Werte der anderen Person</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alt responses -->
+        <div class="card">
+          <div class="card-head"><div class="card-hl"><div class="cdot cgo"></div><div><div class="cname">Alternative Antwortstrategien</div><div class="csub">Mit Wirkungsanalyse</div></div></div></div>
+          <div class="card-body"><div class="alt-list" id="alt-list"></div></div>
+        </div>
+
+        <!-- Pattern -->
+        <div class="card">
+          <div class="card-head"><div class="card-hl"><div class="cdot cb"></div><div><div class="cname">Dein Kommunikationsmuster</div><div class="csub">Liebevoll & präzise</div></div></div></div>
+          <div class="card-body">
+            <div id="tr-pattern" style="font-size:14px;line-height:1.75;color:var(--txm)"></div>
+            <div id="tr-growth" style="margin-top:12px;padding:12px 14px;background:rgba(42,71,64,.05);border-left:2px solid var(--p);border-radius:0 8px 8px 0;font-size:13px;line-height:1.65;color:var(--txm)"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── STEP 4: VERLAUF / JOURNAL ── -->
+    <div class="screen" id="screen-4">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="stitle">Dein GFK-Verlauf</div>
+          <div class="sdesc">Gespeichert lokal · privat · nur auf diesem Gerät</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" onclick="exportJournal()" title="Exportieren">↓ Export</button>
+          <button class="btn-sm" onclick="clearJournal()" title="Alle löschen" style="color:var(--acc)">✕ Alle</button>
+        </div>
+      </div>
+
+      <!-- Trend overview -->
+      <div class="trends" id="jTrends">
+        <div class="trend-card"><div class="trend-n" id="jt-count">0</div><div class="trend-l">Analysen gesamt</div></div>
+        <div class="trend-card"><div class="trend-n" id="jt-streak">0</div><div class="trend-l">Tage in Folge</div></div>
+        <div class="trend-card"><div class="trend-n" id="jt-top">–</div><div class="trend-l">Häufigste Quelle</div></div>
+      </div>
+
+      <!-- Filter -->
+      <div class="jfilter">
+        <button class="chip act" onclick="filterJournal(this,'all')">Alle</button>
+        <button class="chip" onclick="filterJournal(this,'partner')">Partner·in</button>
+        <button class="chip" onclick="filterJournal(this,'mother')">Mutter</button>
+        <button class="chip" onclick="filterJournal(this,'father')">Vater</button>
+        <button class="chip" onclick="filterJournal(this,'friend')">Freund·in</button>
+        <button class="chip" onclick="filterJournal(this,'colleague')">Kolleg·in</button>
+        <button class="chip" onclick="filterJournal(this,'other')">Andere</button>
+        <span class="jcount" id="jcount"></span>
+      </div>
+
+      <!-- Journal list -->
+      <div class="jlist" id="jlist"></div>
+    </div>
+
+    <!-- ── STEP 5: BEZIEHUNGSKARTE ── -->
+    <div class="screen" id="screen-5">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="stitle">Beziehungskarte</div>
+          <div class="sdesc">Aus deinem Verlauf berechnet · ziehen zum Verschieben · tippen für Details</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-sm" onclick="resetMapPositions()">↺ Reset</button>
+          <button class="btn-sm" onclick="showMapAddPanel(null)" id="map-add-top-btn">+ Person</button>
+        </div>
+      </div>
+
+      <!-- Insight strip (auto-generated from journal data) -->
+      <div class="map-insight" id="mapInsight">Analysiere deinen Verlauf …</div>
+
+      <!-- Canvas wrap -->
+      <div class="map-wrap" id="mapWrap">
+        <canvas id="map-canvas"></canvas>
+        <div class="map-detail" id="mapDetail"></div>
+        <div class="map-add-panel" id="mapAddPanel"></div>
+        <div class="map-legend">
+          <div class="mleg-row"><div class="mleg-dot" style="background:#4A9B7F"></div>Nährend</div>
+          <div class="mleg-row"><div class="mleg-dot" style="background:#C47B3A"></div>Herausfordernd</div>
+          <div class="mleg-row"><div class="mleg-dot" style="background:#B05050"></div>Belastend</div>
+          <div class="mleg-row"><div class="mleg-dot" style="background:#8A9890"></div>Neutral</div>
+          <div style="height:.5px;background:var(--bd);margin:3px 0"></div>
+          <div style="font-size:10px;color:var(--txs);line-height:1.5">Nähe = emotionale Distanz<br>Größe = Bedeutung<br>● Konflikt-Marker</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────
+// ── Backend URL ── setze deine Vercel-URL hier ein
+const BACKEND = 'https://resonanz-backend.vercel.app'; // ← deine URL nach dem Deploy
+
+const S={
+  model:'claude',mtype:'cloud',tab:'text',src:'partner',outputLang:'de',outputLangName:'Deutsch',outputLangFlag:'🇩🇪',
+  togs:{self:true,resp:true,sum:true,trig:true,train:true},
+  afiles:[],transcripts:[],popWord:null,
+  lastGFK:null,curStep:1
+};
+
+// ── Model selection (settings drawer only) ────────
+function pickModel(el,id,lbl,type){
+  setModel(id,lbl,type);
+  document.querySelectorAll('#model-opts .mopt').forEach(o=>{
+    o.classList.remove('sel');o.style.background='';
+  });
+  el.classList.add('sel');el.style.background='rgba(42,71,64,.06)';
+}
+function setModel(id,lbl,type){
+  S.model=id;S.mtype=type;
+  document.getElementById('plbl').textContent=lbl;
+  const d=document.getElementById('pdot');d.className='mdot'+(type==='local'?' loc':'');
+  document.getElementById('key-claude').style.display=id==='claude'?'':'none';
+  document.getElementById('key-openai').style.display=id==='gpt4'?'':'none';
+  document.getElementById('key-ollama').style.display=type==='local'?'':'none';
+}
+
+// ── Settings drawer ───────────────────────────────
+function openSettings(){document.getElementById('settingsOv').classList.add('open')}
+function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
+function showInstallGuide(){
+  const el=document.getElementById('installGuideOv');
+  if(el)el.classList.add('open');
+  else if(deferredInstall)doInstall();
+  else showToast('Im Browser-Menü: Zum Startbildschirm hinzufügen');
+}
+
+// ── Key persistence (XOR + PIN, localStorage) ────
+const KEY_STORE = 'resonanz_keys_v1';
+
+function xorCrypt(str, pin) {
+  // Simple XOR with PIN — not bulletproof but protects against casual snooping
+  let out = '';
+  for (let i = 0; i < str.length; i++) {
+    out += String.fromCharCode(str.charCodeAt(i) ^ pin.charCodeAt(i % pin.length));
+  }
+  return btoa(unescape(encodeURIComponent(out)));
+}
+function xorDecrypt(b64, pin) {
+  try {
+    const str = decodeURIComponent(escape(atob(b64)));
+    let out = '';
+    for (let i = 0; i < str.length; i++) {
+      out += String.fromCharCode(str.charCodeAt(i) ^ pin.charCodeAt(i % pin.length));
+    }
+    return out;
+  } catch { return ''; }
+}
+
+function saveKeys() {
+  const pin = document.getElementById('keyPin').value.trim();
+  if (pin.length < 4) { showToast('PIN muss 4 Stellen haben'); return; }
+
+  const data = {
+    ckey: document.getElementById('ckey').value.trim(),
+    okey: document.getElementById('okey').value.trim(),
+    wkey: '', // whisper key handled by backend
+    olurl: document.getElementById('olurl').value.trim(),
+    
+    model: S.model,
+    mtype: S.mtype,
+    ts: Date.now()
+  };
+
+  const encrypted = xorCrypt(JSON.stringify(data), pin);
+  localStorage.setItem(KEY_STORE, encrypted);
+  document.getElementById('keyPin').value = '';
+  showKeysSavedState(true);
+  showToast('Keys gespeichert 🔒');
+  // Orange pill border gone
+  document.getElementById('mpill').style.borderColor = 'var(--bd)';
+}
+
+function loadKeys(pin) {
+  const stored = localStorage.getItem(KEY_STORE);
+  if (!stored) return false;
+  try {
+    const json = xorDecrypt(stored, pin);
+    const data = JSON.parse(json);
+    // Validate — keys should start with sk-
+    if (!data.ckey && !data.okey && !data.wkey) return false;
+    if (data.ckey) document.getElementById('ckey').value = data.ckey;
+    if (data.okey) document.getElementById('okey').value = data.okey;
+    // wkey handled by backend
+    if (data.olurl) document.getElementById('olurl').value = data.olurl;
+
+    if (data.model) setModel(data.model,
+      {claude:'Claude Sonnet',gpt4:'GPT-4o',llama:'Llama 3.2',mistral:'Mistral 7B'}[data.model]||data.model,
+      data.mtype||'cloud');
+    // Update status indicators
+    ['claude','openai','whisper'].forEach(w => {
+      const el = document.getElementById('key-status-'+w);
+      const val = w==='claude'?data.ckey:w==='openai'?data.okey:data.wkey;
+      if (el && val) { el.textContent='✓ Geladen'; el.style.color='var(--p)'; }
+    });
+    showKeysSavedState(true);
+    return true;
+  } catch { return false; }
+}
+
+function clearSavedKeys() {
+  if (!confirm('Gespeicherte Keys löschen?')) return;
+  localStorage.removeItem(KEY_STORE);
+  document.getElementById('ckey').value = '';
+  document.getElementById('okey').value = '';
+  document.getElementById('wkey').value = '';
+  showKeysSavedState(false);
+  showToast('Keys gelöscht');
+}
+
+function showKeysSavedState(saved) {
+  document.getElementById('keys-saved-bar').style.display = saved ? 'flex' : 'none';
+  document.getElementById('key-save-row').style.display = saved ? 'none' : '';
+}
+
+function promptPinAndLoad() {
+  // Only if keys are stored
+  if (!localStorage.getItem(KEY_STORE)) return;
+  // Show PIN prompt overlay
+  const ov = document.createElement('div');
+  ov.id = 'pin-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(24,40,31,.5);z-index:800;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `
+    <div style="background:var(--sur);border-radius:var(--rxl);padding:28px 24px;width:100%;max-width:320px;text-align:center">
+      <div style="font-size:2rem;margin-bottom:12px">🔐</div>
+      <div style="font-size:15px;font-weight:500;color:var(--tx);margin-bottom:6px">Keys entsperren</div>
+      <div style="font-size:13px;color:var(--txs);margin-bottom:20px">4-stellige PIN eingeben um deine gespeicherten API-Keys zu laden</div>
+      <input id="pin-input" type="password" inputmode="numeric" maxlength="4"
+        style="width:100%;padding:14px;text-align:center;font-size:1.5rem;letter-spacing:10px;border:.5px solid var(--bds);border-radius:var(--r);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;margin-bottom:12px"
+        placeholder="••••" oninput="tryLoadPin(this.value)">
+      <div id="pin-error" style="font-size:12px;color:var(--acc);min-height:16px;margin-bottom:12px"></div>
+      <button onclick="document.getElementById('pin-overlay').remove()"
+        style="width:100%;padding:10px;border-radius:var(--r);border:.5px solid var(--bds);background:transparent;color:var(--txm);font-size:13px;cursor:pointer;font-family:inherit">
+        Ohne Keys fortfahren
+      </button>
+    </div>`;
+  document.body.appendChild(ov);
+  setTimeout(() => document.getElementById('pin-input')?.focus(), 100);
+}
+
+function tryLoadPin(pin) {
+  if (pin.length < 4) return;
+  const ok = loadKeys(pin);
+  if (ok) {
+    document.getElementById('pin-overlay')?.remove();
+    showToast('Keys geladen ✓');
+  } else {
+    const err = document.getElementById('pin-error');
+    if (err) { err.textContent = 'Falsche PIN — bitte nochmal'; }
+    setTimeout(() => { if(err) err.textContent=''; }, 2000);
+    document.getElementById('pin-input').value = '';
+  }
+}
+
+function updateKeyStatus(which, val) {
+  const el = document.getElementById('key-status-'+which);
+  if (!el) return;
+  if (!val) { el.textContent=''; return; }
+  const ok = (which==='claude' && val.startsWith('sk-ant')) ||
+             ((which==='openai'||which==='whisper') && (val.startsWith('sk-proj')||val.startsWith('sk-')));
+  el.textContent = ok ? '✓ Format korrekt' : '⚠ Unbekanntes Format';
+  el.style.color = ok ? 'var(--p)' : 'var(--acc)';
+}
+
+function showCorsError(){
+  const old=document.getElementById('api-error-card');if(old)old.remove();
+  const card=document.createElement('div');
+  card.id='api-error-card';card.className='err-card';
+  card.innerHTML=`
+    <div class="err-icon">🚧</div>
+    <div style="flex:1">
+      <div class="err-title">Verbindung blockiert (CORS)</div>
+      <div class="err-msg">Dein Browser blockiert den direkten Kontakt zur Whisper API. Das passiert bei Brave, Firefox und manchen Chrome-Einstellungen.</div>
+      <div class="err-msg" style="margin-top:6px;font-weight:500;color:var(--p)">Lösung: Cloudflare Worker als kostenloser Proxy (2 Minuten):</div>
+      <div class="err-msg" style="margin-top:4px">1. <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p)">workers.cloudflare.com</a> → kostenlosen Account erstellen<br>
+      2. "Create Worker" → Code aus <strong>whisper-worker.js</strong> einfügen → Deploy<br>
+      3. Worker-URL in ⚙ Einstellungen → Audio-Transkription eintragen</div>
+      <div class="err-actions">
+        <button class="err-btn pri" onclick="openSettings();document.getElementById('api-error-card')?.remove()">⚙ Einstellungen öffnen</button>
+        <button class="err-btn sec" onclick="this.closest('.err-card').remove()">Schließen</button>
+      </div>
+    </div>`;
+  document.getElementById('screen-1').appendChild(card);
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function updateProxyStatus(val){
+  const el=document.getElementById('proxy-status');
+  const hint=document.getElementById('proxy-hint');
+  if(!el)return;
+  if(!val){el.textContent='';if(hint)hint.style.display='block';return;}
+  const ok=val.startsWith('https://')&&val.includes('workers.dev');
+  el.textContent=ok?'✓ Format sieht korrekt aus':'⚠ Sollte mit https://...workers.dev enden';
+  el.style.color=ok?'var(--p)':'var(--acc)';
+  if(hint)hint.style.display='none';
+}
+
+function updatePillStatus() {
+  const pill = document.getElementById('mpill');
+  if (!pill) return;
+  const hasKey = (S.model==='claude' && document.getElementById('ckey').value.trim()) ||
+                 (S.model==='gpt4' && document.getElementById('okey').value.trim()) ||
+                 S.mtype==='local';
+  pill.style.borderColor = hasKey ? 'var(--bd)' : 'rgba(181,90,44,.35)';
+}
+
+// ── Toggle switches ───────────────────────────────
+function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
+
+function updateWhisperEngineUI(){}
+
+// ── Output language ───────────────────────────────
+function pickLang(el,code,name){
+  S.outputLang=code;S.outputLangName=name;
+  // Derive flag from code
+  const flags={de:'🇩🇪',en:'🇬🇧',es:'🇪🇸',fr:'🇫🇷',it:'🇮🇹',tr:'🇹🇷',ar:'🇸🇦',ru:'🇷🇺',zh:'🇨🇳',ja:'🇯🇵',pt:'🇧🇷',nl:'🇳🇱'};
+  S.outputLangFlag=flags[code]||'🌐';
+  // Update pill
+  document.getElementById('langFlag').textContent=S.outputLangFlag;
+  document.getElementById('langName').textContent=code.toUpperCase();
+  // Update selector
+  document.querySelectorAll('#lang-opts .lang-opt').forEach(o=>o.classList.remove('sel'));
+  el.classList.add('sel');
+}
+
+// ── Steps ─────────────────────────────────────────
+function goStep(n){
+  if(n===4){
+    S.curStep=4;
+    document.querySelectorAll('.step').forEach((s,i)=>{s.classList.remove('act','done');if(i<3)s.classList.add('done');});
+    document.getElementById('step-4').classList.add('act');document.getElementById('step-4').classList.remove('done');
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
+    document.getElementById('screen-4').classList.add('act');
+    renderJournal();window.scrollTo({top:0,behavior:'smooth'});return;
+  }
+  if(n>1&&!S.lastGFK){showToast('Bitte zuerst eine Nachricht analysieren.');return;}
+  S.curStep=n;
+  document.querySelectorAll('.step').forEach((s,i)=>{s.classList.remove('act','done');if(i+1<n)s.classList.add('done');});
+  document.getElementById('step-'+n).classList.add('act');document.getElementById('step-'+n).classList.remove('done');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
+  document.getElementById('screen-'+n).classList.add('act');
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// ── Input tabs ─────────────────────────────────────
+function switchITab(t,btn){
+  ['text','audio','chat'].forEach(id=>document.getElementById('itab-'+id).style.display=id===t?'':'none');
+  document.querySelectorAll('.itab').forEach(b=>b.classList.remove('act'));
+  btn.classList.add('act');S.tab=t;
+}
+
+// ── Source chips ──────────────────────────────────
+function setSrc(el,v){
+  document.querySelectorAll('#screen-1 .chip').forEach(c=>c.classList.remove('act'));
+  el.classList.add('act');S.src=v;
+}
+
+// ── Audio ─────────────────────────────────────────
+function doDrop(e){
+  e.preventDefault();document.getElementById('adrop').classList.remove('drag');
+  const fs=[...e.dataTransfer.files].filter(f=>f.type.startsWith('audio/'));
+  if(fs.length)addFiles(fs);
+}
+function addFiles(fl){
+  [...fl].forEach(f=>{
+    if(S.afiles.find(x=>x.name===f.name&&x.size===f.size))return;
+    const id='a'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
+    S.afiles.push({id,file:f,name:f.name,size:f.size,status:'p',url:URL.createObjectURL(f)});
+  });
+  renderAList();document.getElementById('aIn').value='';
+}
+function retryFile(id){
+  const af=S.afiles.find(f=>f.id===id);
+  if(af){af.status='p';setStat(id,'p');renderAList();}
+  transcribeAll();
+}
+function removeAF(id){S.afiles=S.afiles.filter(f=>f.id!==id);S.transcripts=S.transcripts.filter(t=>t.id!==id);renderAList();renderTRs();}
+function renderAList(){
+  const l=document.getElementById('alist');
+  const ta=document.getElementById('transcribe-action');
+  if(!S.afiles.length){
+    l.innerHTML='';
+    if(ta)ta.style.display='none';
+    return;
+  }
+  l.innerHTML=S.afiles.map(af=>`
+    <div class="aitem" id="ai_${af.id}">
+      <button class="aplay" id="ap_${af.id}" onclick="togglePlay('${af.id}')">▶</button>
+      <div class="ainfo">
+        <div class="aname">${af.name}</div>
+        <div class="ameta">${fmtSz(af.size)} · <span id="dur_${af.id}">–</span></div>
+        <div class="apl-wrap" id="aw_${af.id}">
+          <audio id="aud_${af.id}" src="${af.url}" onloadedmetadata="setDur('${af.id}',this)" onended="resetPB('${af.id}')"></audio>
+        </div>
+      </div>
+      <span class="astat ${af.status}_" id="ast_${af.id}">${stLbl(af.status)}</span>
+      ${af.status==='e'?`<button class="btn-sm" onclick="retryFile('${af.id}')" style="font-size:11px;padding:3px 8px">↺</button>`:''}
+      <button class="adel" onclick="removeAF('${af.id}')">✕</button>
+    </div>`).join('');
+  // Show transcribe button only if there are pending files
+  const hasPending=S.afiles.some(f=>f.status==='p');
+  if(ta)ta.style.display=hasPending?'flex':'none';
+  // Update hint
+  const hint=document.getElementById('transcribe-hint');
+  if(hint){
+    const pCount=S.afiles.filter(f=>f.status==='p').length;
+    const total=S.afiles.length;
+    const done=S.afiles.filter(f=>f.status==='d').length;
+    if(done>0&&hasPending)hint.textContent=`${done}/${total} fertig · ${pCount} ausstehend`;
+    else hint.textContent='Transkript erscheint nach jeder Datei';
+  }
+}
+function setDur(id,el){const d=el.duration;if(d&&isFinite(d))document.getElementById('dur_'+id).textContent=fT(d)}
+function togglePlay(id){
+  const a=document.getElementById('aud_'+id),w=document.getElementById('aw_'+id),b=document.getElementById('ap_'+id);
+  if(!a)return;w.style.display='block';
+  if(a.paused){a.play();b.textContent='■';}else{a.pause();b.textContent='▶';}
+}
+function resetPB(id){const b=document.getElementById('ap_'+id);if(b)b.textContent='▶';}
+function fmtSz(b){return b>1048576?(b/1048576).toFixed(1)+' MB':(b/1024).toFixed(0)+' KB'}
+function fT(s){const m=Math.floor(s/60);return m+':'+(Math.floor(s%60)+'').padStart(2,'0')}
+function stLbl(s){return{p:'Ausstehend',t:'Transkribiere…',d:'✓ Fertig',e:'Fehler'}[s]||s}
+function setStat(id,s){
+  const el=document.getElementById('ast_'+id);
+  if(el){el.textContent=stLbl(s);el.className='astat '+s+'_';}
+  const af=S.afiles.find(f=>f.id===id);if(af)af.status=s;
+  // Update button + hint
+  const ta=document.getElementById('transcribe-action');
+  const hasPending=S.afiles.some(f=>f.status==='p');
+  const isTranscribing=S.afiles.some(f=>f.status==='t');
+  if(ta)ta.style.display=(hasPending||isTranscribing)?'flex':'none';
+  const hint=document.getElementById('transcribe-hint');
+  if(hint){
+    const done=S.afiles.filter(f=>f.status==='d').length;
+    const total=S.afiles.length;
+    if(isTranscribing)hint.textContent=`Transkribiere … ${done}/${total}`;
+    else if(done===total&&total>0)hint.textContent=`Alle ${total} Dateien fertig ✓`;
+    else if(done>0)hint.textContent=`${done}/${total} fertig · ${S.afiles.filter(f=>f.status==='p').length} ausstehend`;
+    else hint.textContent='Transkript erscheint nach jeder Datei';
+  }
+}
+
+// ── Transcription ─────────────────────────────────
+async function transcribeAll(){
+  const pend=S.afiles.filter(f=>f.status==='p');
+  if(!pend.length)return;
+  const wlangEl=document.getElementById('wlang');
+  const lang=(wlangEl?wlangEl.value:'')||'de';
+  const tb=document.getElementById('transcribeBtn');
+  if(tb){tb.disabled=true;tb.classList.add('ld');}
+  for(const af of pend){
+    setStat(af.id,'t');
+    try{
+      const res=await trOpenAI(af.file,lang);
+      af.status='d';
+      S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
+      S.transcripts.push({id:af.id,name:af.name,url:af.url,...res,demo:false});
+    }catch(err){
+      af.status='e';
+      let msg=err.message||String(err);
+      try{const j=JSON.parse(msg);msg=j.error?.message||msg;}catch{}
+      showAPIError('Transkription: '+msg);
+    }
+    setStat(af.id,af.status);
+    renderTRs();
+  }
+  if(tb){tb.disabled=false;tb.classList.remove('ld');}
+}
+
+
+async function trOpenAI(file,lang){
+  // .opus → .ogg (same codec, Whisper doesn't accept .opus filename)
+  let sendFile=file;
+  if(file.name.toLowerCase().endsWith('.opus')){
+    sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
+  }
+  const fd=new FormData();
+  fd.append('audio',sendFile);
+  const r=await fetch(BACKEND+'/api/transcribe?lang='+encodeURIComponent(lang||'de'),{
+    method:'POST',body:fd
+  });
+  if(!r.ok){
+    const e=await r.json().catch(()=>({}));
+    throw new Error(e.error||`Transkription Fehler ${r.status}`);
+  }
+  const d=await r.json();
+  const words=(d.words||[]).map(w=>({
+    word:w.word.trim(),start:w.start,end:w.end,
+    prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14
+  }));
+  return{text:d.text,words};
+}
+function simTR(){
+  const base=[
+    {word:'Ich',start:.1,end:.4,prob:.98},{word:'wollte',start:.4,end:.75,prob:.95},{word:'dir',start:.8,end:.95,prob:.97},
+    {word:'sagen',start:1.25,end:1.6,prob:.94},{word:'dass',start:1.7,end:1.9,prob:.92},
+    {word:'ich',start:2,end:2.15,prob:.99},{word:'heute',start:2.2,end:2.55,prob:.91},
+    {word:'wirklich',start:2.6,end:3,prob:.89},{word:'frusstriert',start:3.1,end:3.7,prob:.28},
+    {word:'bin',start:3.75,end:3.95,prob:.97},{word:'weil',start:4,end:4.2,prob:.96},
+    {word:'du',start:4.25,end:4.4,prob:.99},{word:'dich',start:4.45,end:4.65,prob:.93},
+    {word:'nie',start:4.7,end:4.9,prob:.91},{word:'meldest',start:4.95,end:5.45,prob:.24},
+    {word:'und',start:5.5,end:5.65,prob:.98},{word:'das',start:5.7,end:5.85,prob:.97},
+    {word:'macht',start:5.9,end:6.2,prob:.93},{word:'mir',start:6.25,end:6.4,prob:.98},
+    {word:'Angst',start:6.45,end:6.85,prob:.86},{word:'dass',start:6.9,end:7.1,prob:.94},
+    {word:'ich',start:7.15,end:7.3,prob:.99},{word:'dir',start:7.35,end:7.5,prob:.96},
+    {word:'vielleicht',start:7.55,end:8.05,prob:.27},{word:'egal',start:8.1,end:8.4,prob:.87},{word:'bin',start:8.45,end:8.65,prob:.98},
+  ];
+  return{text:base.map(w=>w.word).join(' '),words:base};
+}
+function renderTRs(){
+  const area=document.getElementById('trArea');
+  if(!S.transcripts.length){area.innerHTML='';return;}
+  area.innerHTML=S.transcripts.map(tr=>{
+    const unc=(tr.words||[]).filter(w=>w.prob<0.6).length;
+    return`<div class="tr-sec">
+      <div class="tr-head">
+        ${tr.name}
+        ${tr.demo?`<span class="tr-unc" style="background:rgba(154,122,70,.12);color:var(--gold)">Demo · kein Key</span>`:''}
+        ${unc&&!tr.demo?`<span class="tr-unc">${unc} unklare Wörter</span>`:''}
+      </div>
+      <div class="tr-body">${renderWords(tr)}</div>
+    </div>`;
+  }).join('');
+}
+function renderWords(tr){
+  if(!tr.words||!tr.words.length)return`<span>${tr.text}</span>`;
+  return tr.words.map(w=>{
+    if(w.prob<0.6){const esc=encodeURIComponent(w.word);return`<span class="tw u" onclick="openPop(event,'${tr.id}','${tr.url}',${w.start},${w.end},'${esc}')" title="${Math.round(w.prob*100)}% — Klicken zum Korrigieren">${w.word}</span><sup class="twt">${fT(w.start)}</sup> `;}
+    return`<span class="tw">${w.word}</span> `;
+  }).join('');
+}
+
+// ── Word popup ────────────────────────────────────
+function openPop(e,trId,url,start,end,wEnc){
+  e.stopPropagation();
+  const word=decodeURIComponent(wEnc);
+  S.popWord={trId,word,start,end};
+  document.getElementById('wpop-time').textContent='⏱ '+fT(start)+' – '+fT(end)+' · Konfidenz niedrig';
+  document.getElementById('wpop-in').value=word;
+  const a=document.getElementById('wpop-aud');
+  a.src=url;a.currentTime=Math.max(0,start-.2);a.play().catch(()=>{});
+  setTimeout(()=>a.pause(),(end-start+.7)*1000);
+  const r=e.currentTarget.getBoundingClientRect();
+  const pop=document.getElementById('wpop');
+  pop.style.top=(r.bottom+6+window.scrollY)+'px';
+  pop.style.left=Math.min(r.left,window.innerWidth-278)+'px';
+  pop.classList.add('open');
+  setTimeout(()=>document.getElementById('wpop-in').focus(),50);
+}
+function closePop(){document.getElementById('wpop').classList.remove('open');document.getElementById('wpop-aud').pause();S.popWord=null;}
+function applyFix(){
+  if(!S.popWord)return;
+  const nw=document.getElementById('wpop-in').value.trim();if(!nw)return;
+  const{trId,start}=S.popWord;
+  const tr=S.transcripts.find(t=>t.id===trId);if(!tr)return;
+  const w=tr.words.find(x=>Math.abs(x.start-start)<.02);
+  if(w){w.word=nw;w.prob=1;}
+  tr.text=tr.words.map(w=>w.word).join(' ');
+  renderTRs();closePop();showToast('Wort korrigiert ✓');
+}
+document.addEventListener('click',e=>{if(!document.getElementById('wpop').contains(e.target))closePop();});
+document.getElementById('wpop-in').addEventListener('keydown',e=>{if(e.key==='Enter')applyFix();if(e.key==='Escape')closePop();});
+
+// ── Get message ───────────────────────────────────
+function getText(){
+  if(S.tab==='text')return document.getElementById('msgIn').value.trim();
+  if(S.tab==='chat')return document.getElementById('chatIn').value.trim();
+  if(S.tab==='audio'){
+    if(!S.transcripts.length)return '';
+    if(S.transcripts.length===1)return S.transcripts[0].text;
+    // Multiple files: label each and combine
+    return S.transcripts.map((t,i)=>`[Nachricht ${i+1} – ${t.name}]:\n${t.text}`).join('\n\n');
+  }
+  return'';
+}
+
+// ── Prompts ───────────────────────────────────────
+function buildGFKPrompt(msg,ctx){
+  const srcMap={partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'};
+  const lang=S.outputLang||'de';
+  const langInstr=lang==='de'?'Antworte auf Deutsch.'
+    :lang==='en'?'Respond in English.'
+    :lang==='es'?'Responde en español.'
+    :lang==='fr'?'Réponds en français.'
+    :lang==='it'?'Rispondi in italiano.'
+    :lang==='tr'?'Türkçe yanıt ver.'
+    :lang==='ar'?'أجب باللغة العربية.'
+    :lang==='ru'?'Отвечай на русском языке.'
+    :lang==='zh'?'用中文回答。'
+    :lang==='ja'?'日本語で回答してください。'
+    :lang==='pt'?'Responda em português.'
+    :lang==='nl'?'Antwoord in het Nederlands.'
+    :`Respond in ${S.outputLangName||lang}.`;
+  return`You are a NVC (Nonviolent Communication) coach. Analyze the message from ${srcMap[S.src]||'a person'}. ${langInstr} Reply ONLY with valid JSON — no markdown, no explanation outside JSON.\n\n${ctx?'Context: '+ctx+'\n':''}Message: "${msg}"\n\n{"self":{"observation":"factual observation without judgment","feeling":"concrete NVC feeling","need":"deep universal need","request":"request to myself"},"response":"empathetic NVC response 2-4 sentences","summary":"neutral summary 2-3 sentences","tags":["tag1","tag2"],"triggers":[{"phrase":"triggering phrase","explanation":"which old pattern does this activate?"}]}`;
+}
+function buildTrainPrompt(origMsg,gfk,userResp,ctx){
+  const lang=S.outputLang||'de';
+  const langInstr=lang==='de'?'Antworte auf Deutsch.'
+    :lang==='en'?'Respond in English.'
+    :lang==='es'?'Responde en español.'
+    :lang==='fr'?'Réponds en français.'
+    :lang==='it'?'Rispondi in italiano.'
+    :lang==='tr'?'Türkçe yanıt ver.'
+    :lang==='ar'?'أجب باللغة العربية.'
+    :lang==='ru'?'Отвечай на русском языке.'
+    :lang==='zh'?'用中文回答。'
+    :lang==='ja'?'日本語で回答してください。'
+    :lang==='pt'?'Responda em português.'
+    :lang==='nl'?'Antwoord in het Nederlands.'
+    :`Respond in ${S.outputLangName||lang}.`;
+  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"short label","text":"what this response reveals about the user"}],"recipientPerspective":[{"icon":"emoji","label":"short label","text":"how it lands with the other person"}],"values":[{"name":"value name","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"short title","description":"short description"},"alternatives":[{"strategy":"name","effect":"short","text":"concrete response","tradeoff":"gain/loss"}],"pattern":"communication pattern described warmly","growth":"concrete growth impulse"}`;
+}
+
+// ── Key helpers ──────────────────────────────────
+function getKey(id){const el=document.getElementById(id);return el?el.value.trim():'';}
+function hasValidKey(){
+  if(S.mtype==='local')return true;
+  if(S.model==='claude')return getKey('ckey').length>10;
+  if(S.model==='gpt4')return getKey('okey').length>10;
+  return false;
+}
+function hasWhisperKey(){return getKey('wkey').length>10||getKey('okey').length>10;}
+
+// ── API calls — über Backend (keys nie im Browser) ──
+async function callAPI(prompt){
+  // Ollama lokal — direkt, kein Backend nötig
+  if(S.mtype==='local'){
+    const url=getKey('olurl')||'http://localhost:11434';
+    const m=S.model==='llama'?'llama3.2':'mistral';
+    const r=await fetch(url+'/api/generate',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:m,prompt,stream:false})
+    });
+    if(!r.ok)throw new Error(`Ollama nicht erreichbar unter ${url} — läuft Ollama?`);
+    return(await r.json()).response;
+  }
+
+  // Cloud-Modelle → über Resonanz-Backend (kein Key im Browser)
+  const r=await fetch(BACKEND+'/api/analyse',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({prompt,model:S.model})
+  });
+  if(!r.ok){
+    const e=await r.json().catch(()=>({}));
+    throw new Error(e.error||`Server-Fehler ${r.status} — Backend erreichbar?`);
+  }
+  const d=await r.json();
+  return d.result;
+}
+function parseJSON(raw){try{return JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{return null;}}
+
+// ── Fehler-UI ─────────────────────────────────────
+function showKeyError(){
+  const names={claude:'Anthropic API-Key (sk-ant-…)',gpt4:'OpenAI API-Key (sk-proj-…)',llama:'Ollama lokal (kein Key nötig — läuft Ollama?)',mistral:'Ollama lokal (kein Key nötig — läuft Ollama?)'};
+  const name=names[S.model]||S.model;
+  showAPIError('Kein '+name+' eingetragen.',true);
+}
+function showAPIError(msg, isKeyError=false){
+  const old=document.getElementById('api-error-card');if(old)old.remove();
+  const card=document.createElement('div');
+  card.id='api-error-card';
+  card.className='err-card';
+  card.innerHTML=`
+    <div class="err-icon">⚠</div>
+    <div style="flex:1">
+      <div class="err-title">${isKeyError?'API-Key fehlt':'Fehler'}</div>
+      <div class="err-msg">${msg}</div>
+      ${isKeyError?`<div class="err-msg" style="margin-top:5px;opacity:.7">Dein Key bleibt ausschließlich auf diesem Gerät — er geht direkt an die API, kein Server dazwischen.</div>`:''}
+      <div class="err-actions">
+        ${isKeyError?`<button class="err-btn pri" onclick="openSettings();document.getElementById('api-error-card')?.remove()">⚙ Einstellungen öffnen</button>`:''}
+        <button class="err-btn sec" onclick="this.closest('.err-card').remove()">Schließen</button>
+        ${!isKeyError?`<button class="err-btn sec" onclick="fullReset()">↺ Zurücksetzen</button>`:''}
+      </div>
+    </div>`;
+  const screen=document.getElementById('screen-1');
+  screen.appendChild(card);
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+// ── Full Reset ─────────────────────────────────────
+function fullReset(){
+  if(!confirm('Alles zurücksetzen? Aktuelle Eingaben und Analyse werden gelöscht.'))return;
+  // Clear inputs
+  document.getElementById('msgIn').value='';
+  document.getElementById('chatIn').value='';
+  document.getElementById('ctxIn').value='';
+  document.getElementById('userResp').value='';
+  // Clear audio
+  S.afiles=[];S.transcripts=[];renderAList();renderTRs();
+  // Clear analysis
+  S.lastGFK=null;
+  // Clear training
+  const tr=document.getElementById('trainResults');if(tr)tr.style.display='none';
+  // Clear errors
+  const err=document.getElementById('api-error-card');if(err)err.remove();
+  const banner=document.getElementById('share-recv-banner');if(banner)banner.remove();
+  // Hide reset FAB
+  document.getElementById('resetFab').classList.remove('show');
+  // Back to step 1
+  S.curStep=1;
+  document.querySelectorAll('.step').forEach(s=>{s.classList.remove('act','done');});
+  document.getElementById('step-1').classList.add('act');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
+  document.getElementById('screen-1').classList.add('act');
+  // Switch to text tab
+  switchITab('text',document.querySelectorAll('.itab')[0]);
+  window.scrollTo({top:0,behavior:'smooth'});
+  showToast('Zurückgesetzt ✓');
+}
+
+// ── Messenger Share Hint ───────────────────────────
+function handleMessengerShare(app){
+  const isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  if(!isPWA){
+    // Show install hint
+    document.getElementById('share-install-hint').style.display='block';
+    document.getElementById('share-from-label').textContent='App installieren für Teilen-Integration:';
+    showToast('Resonanz auf Homescreen installieren → dann erscheint es im Teilen-Menü');
+    // Trigger install prompt if available
+    if(deferredInstall){doInstall();}
+    return;
+  }
+  // If already PWA, guide user
+  const guides={
+    whatsapp:'WhatsApp → Nachricht gedrückt halten → Weiterleiten → Resonanz wählen',
+    telegram:'Telegram → Nachricht antippen → Teilen → Resonanz wählen',
+    signal:'Signal → Nachricht gedrückt halten → Teilen → Resonanz wählen',
+    imessage:'iMessage → Nachricht gedrückt halten → Mehr → Resonanz wählen'
+  };
+  showToast(guides[app]||'Im Teilen-Menü: Resonanz auswählen');
+}
+
+
+
+// ── Run Analysis ──────────────────────────────────
+async function runAnalysis(){
+  const old=document.getElementById('api-error-card');if(old)old.remove();
+  if(S.tab==='audio'&&S.afiles.filter(f=>f.status==='p').length)await transcribeAll();
+  const msg=getText();if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
+  const ctx=document.getElementById('ctxIn').value.trim();
+
+  // Show loading
+  const btn=document.getElementById('analyseBtn');
+  btn.disabled=true;btn.classList.add('ld');
+  const lc=document.getElementById('lcard-1');lc.classList.add('show');
+
+  const msgs=[['Höre mit dem Herzen zu …','Erkenne Beobachtungen, Gefühle und Bedürfnisse'],['Erkenne Muster …','Identifiziere Trigger und alte Wunden'],['Formuliere mit Mitgefühl …','Erstelle GFK-Antwortvorschläge']];
+  let mi=0;const li=setInterval(()=>{mi=(mi+1)%msgs.length;document.getElementById('lt1').textContent=msgs[mi][0];document.getElementById('ls1').textContent=msgs[mi][1];},1800);
+
+  try{
+    const raw=await callAPI(buildGFKPrompt(msg,ctx));
+    const res=parseJSON(raw);
+    if(!res)throw new Error('Ungültige Antwort vom Modell — bitte nochmals versuchen.');
+    S.lastGFK=res;
+    renderAnalysis(res,msg);
+    goStep(2);
+    document.getElementById('resetFab').classList.add('show');
+  }catch(err){
+    showAPIError(err.message);
+  }finally{
+    clearInterval(li);btn.disabled=false;btn.classList.remove('ld');lc.classList.remove('show');
+  }
+}
+
+function renderAnalysis(r,msg){
+  const srcMap={partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
+  document.getElementById('analysis-src-label').textContent='Empfangen von '+(srcMap[S.src]||'Andere');
+
+  const t=S.togs;
+  if(t.self&&r.self){
+    const ks=['observation','feeling','need','request'],ic=['👁','♥','◎','✦'],ct=['Beobachtung','Gefühl','Bedürfnis','Bitte an mich'],cl=['io','if_','in_','ia'];
+    document.getElementById('gSelf').innerHTML=ks.map((k,i)=>`${i>0?'<div class="gfk-sep"></div>':''}
+      <div class="gfk-row"><div class="gfk-ico ${cl[i]}">${ic[i]}</div><div><div class="gfk-cat">${ct[i]}</div><div class="gfk-txt">${r.self[k]||''}</div></div></div>`).join('');
+    document.getElementById('rc-self').style.display='';
+  }else document.getElementById('rc-self').style.display='none';
+
+  if(t.resp&&r.response){document.getElementById('gResp').textContent=r.response;document.getElementById('rc-resp').style.display='';}
+  else document.getElementById('rc-resp').style.display='none';
+
+  if(t.sum&&r.summary){
+    document.getElementById('gSum').textContent=r.summary;
+    document.getElementById('gTags').innerHTML=(r.tags||[]).map(t=>`<span class="tag">${t}</span>`).join('');
+    document.getElementById('rc-sum').style.display='';
+  }else document.getElementById('rc-sum').style.display='none';
+
+  if(t.trig&&r.triggers&&r.triggers.length){
+    document.getElementById('gTrig').innerHTML=r.triggers.map(t=>`<div class="trig-item"><div class="trig-p">»${t.phrase}«</div><div class="trig-e">${t.explanation}</div></div>`).join('');
+    document.getElementById('rc-trig').style.display='';
+  }else document.getElementById('rc-trig').style.display='none';
+
+  document.getElementById('rc-train-hint').style.display=t.train?'':'none';
+
+  // Auto-save to journal
+  saveEntry(r, msg);
+  const jn=loadJournalData().length;
+  document.getElementById('step-4').querySelector('.step-num').textContent=jn<=99?jn:'◎';
+}
+
+// ── Run Training ──────────────────────────────────
+async function runTraining(){
+  const userResp=document.getElementById('userResp').value.trim();
+  if(!userResp){showToast('Bitte eine Antwort schreiben.');return;}
+  if(!S.lastGFK){showToast('Bitte zuerst analysieren.');return;}
+
+  const btn=document.getElementById('trainBtn');
+  btn.disabled=true;btn.classList.add('ld');
+  document.getElementById('lsm-train').classList.add('show');
+  document.getElementById('trainResults').style.display='none';
+
+  try{
+    const origMsg=getText(),ctx=document.getElementById('ctxIn').value.trim();
+    const raw=await callAPI(buildTrainPrompt(origMsg,S.lastGFK,userResp,ctx));
+    const res=parseJSON(raw);
+    if(!res)throw new Error('Ungültige Antwort — bitte nochmals versuchen.');
+    renderTraining(res);
+  }catch(err){
+    showAPIError(err.message);
+  }finally{
+    btn.disabled=false;btn.classList.remove('ld');
+    document.getElementById('lsm-train').classList.remove('show');
+  }
+}
+
+function renderTraining(r){
+  // Self + Recv
+  const renderImpact=(items)=>(items||[]).map(i=>`<div class="impact-row"><div class="impact-ico">${i.icon||'◎'}</div><div><div class="impact-lbl">${i.label||''}</div><div class="impact-txt">${i.text||''}</div></div></div>`).join('');
+  document.getElementById('tr-self').innerHTML=renderImpact(r.selfReflection);
+  document.getElementById('tr-recv').innerHTML=renderImpact(r.recipientPerspective);
+
+  // Values
+  document.getElementById('val-list').innerHTML=(r.values||[]).map(v=>`
+    <div class="val-item">
+      <div class="val-top"><span class="val-name">${v.name}</span><span class="val-shared">${v.shared?'✓ gemeinsam':'↔ verschieden'}</span></div>
+      <div class="val-bars">
+        <div class="val-bar-wrap"><div class="val-bar vbu" style="width:${v.userScore||0}%"></div></div>
+        <div class="val-bar-wrap"><div class="val-bar vbo" style="width:${v.otherScore||0}%"></div></div>
+      </div>
+    </div>`).join('');
+
+  // Alignment ring
+  const al=r.alignment||{},pct=Math.round(al.score||0),circ=163,off=circ-(circ*pct/100);
+  document.getElementById('aPct').textContent=pct+'%';
+  document.getElementById('aTitle').textContent=al.title||'';
+  document.getElementById('aDesc').textContent=al.description||'';
+  setTimeout(()=>document.getElementById('aCircle').style.strokeDashoffset=off,80);
+
+  // Alts
+  document.getElementById('alt-list').innerHTML=(r.alternatives||[]).map(a=>`
+    <div class="alt-item">
+      <div class="alt-head"><span class="alt-strategy">${a.strategy||''}</span><span class="alt-effect">${a.effect||''}</span></div>
+      <div class="alt-body">${a.text||''}</div>
+      <div class="alt-foot">
+        <button class="btn-sm" onclick="navigator.clipboard.writeText(${JSON.stringify(a.text||'')}).then(()=>showToast('Kopiert ✓'))">Kopieren</button>
+        <button class="btn-sm pr" onclick="openShare(${JSON.stringify(a.text||'')})">↗ Teilen</button>
+        ${a.tradeoff?`<span class="alt-tradeoff">${a.tradeoff}</span>`:''}
+      </div>
+    </div>`).join('');
+
+  // Pattern
+  document.getElementById('tr-pattern').textContent=r.pattern||'';
+  document.getElementById('tr-growth').innerHTML=r.growth?`<strong style="font-weight:500;color:var(--p)">Wachstumsimpuls:</strong> ${r.growth}`:'';
+
+  const tr=document.getElementById('trainResults');
+  tr.style.display='flex';tr.style.flexDirection='column';tr.style.gap='14px';
+  tr.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── Copy / Share ──────────────────────────────────
+function copyCard(k){
+  let txt='';
+  if(k==='self'){document.querySelectorAll('#gSelf .gfk-txt').forEach((el,i)=>{const c=['Beobachtung','Gefühl','Bedürfnis','Bitte'];txt+=c[i]+': '+el.textContent+'\n';});}
+  else if(k==='resp')txt=document.getElementById('gResp').textContent;
+  else if(k==='sum')txt=document.getElementById('gSum').textContent;
+  navigator.clipboard.writeText(txt).then(()=>showToast('Kopiert ✓'));
+}
+function copyAll(){
+  const parts=[];
+  document.querySelectorAll('#gSelf .gfk-txt').forEach((el,i)=>{const c=['Beobachtung','Gefühl','Bedürfnis','Bitte'];parts.push(c[i]+': '+el.textContent);});
+  const r=document.getElementById('gResp').textContent;if(r)parts.push('\nGFK-Antwort:\n'+r);
+  const s=document.getElementById('gSum').textContent;if(s)parts.push('\nZusammenfassung:\n'+s);
+  navigator.clipboard.writeText(parts.join('\n')).then(()=>showToast('Alles kopiert ✓'));
+}
+function openShare(txt){
+  document.getElementById('share-txt').textContent=txt;
+  document.getElementById('shareOv').classList.add('open');
+}
+function closeShare(){document.getElementById('shareOv').classList.remove('open')}
+function copyShare(){navigator.clipboard.writeText(document.getElementById('share-txt').textContent).then(()=>showToast('Kopiert ✓'))}
+function svia(app){
+  const txt=document.getElementById('share-txt').textContent,enc=encodeURIComponent(txt);
+  const urls={whatsapp:`https://wa.me/?text=${enc}`,telegram:`https://t.me/share/url?url=&text=${enc}`,sms:`sms:?body=${enc}`,mail:`mailto:?body=${enc}&subject=Meine%20GFK-Antwort`,dating:'https://tinder.com/',ig:'https://www.instagram.com/direct/inbox/',signal:'https://signal.me/'};
+  if(urls[app])window.open(urls[app],'_blank');
+  if(['signal','dating','ig'].includes(app))navigator.clipboard.writeText(txt).then(()=>showToast('Kopiert — App öffnet sich ✓'));
+}
+function svNative(){
+  const txt=document.getElementById('share-txt').textContent;
+  if(navigator.share)navigator.share({text:txt}).catch(()=>{});
+  else navigator.clipboard.writeText(txt).then(()=>showToast('Kopiert ✓'));
+}
+
+// ── Helpers ───────────────────────────────────────
+function loadChat(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>document.getElementById('chatIn').value=e.target.result;r.readAsText(f);}
+function newAnalysis(){S.lastGFK=null;S.transcripts=[];S.afiles=[];renderAList();renderTRs();document.getElementById('trainResults').style.display='none';goStep(1);}
+function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+// ── Journal / Verlauf ─────────────────────────────
+const JK='resonanz_journal';
+const SRC_LABELS={partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
+let jFilter='all';
+
+function loadJournalData(){
+  try{return JSON.parse(localStorage.getItem(JK)||'[]');}catch{return[];}
+}
+function saveJournalData(entries){
+  try{localStorage.setItem(JK,JSON.stringify(entries));}catch{showToast('Speicher voll — ältere Einträge löschen');}
+}
+
+function saveEntry(gfk,msg){
+  const entries=loadJournalData();
+  const entry={
+    id:Date.now()+'_'+Math.random().toString(36).slice(2,5),
+    date:new Date().toISOString(),
+    src:S.src,
+    msgPreview:(msg||'').substring(0,120),
+    feeling:gfk.self?.feeling||'',
+    need:gfk.self?.need||'',
+    observation:gfk.self?.observation||'',
+    request:gfk.self?.request||'',
+    response:gfk.response||'',
+    summary:gfk.summary||'',
+    tags:gfk.tags||[],
+    triggers:(gfk.triggers||[]).map(t=>t.phrase),
+    energy:gfk.triggers&&gfk.triggers.length>0?Math.max(20,70-gfk.triggers.length*15):65
+  };
+  entries.unshift(entry);
+  if(entries.length>200)entries.splice(200);
+  saveJournalData(entries);
+  // Update step-4 badge
+  document.getElementById('step-4').querySelector('.step-num').textContent=entries.length<=99?entries.length:'◎';
+}
+
+function renderJournal(){
+  const all=loadJournalData();
+  const filtered=jFilter==='all'?all:all.filter(e=>e.src===jFilter);
+
+  // Trends
+  document.getElementById('jt-count').textContent=all.length;
+  document.getElementById('jcount').textContent=filtered.length+' Einträge';
+
+  // Streak
+  const streak=calcStreak(all);
+  document.getElementById('jt-streak').textContent=streak;
+
+  // Top source
+  if(all.length){
+    const freq={};all.forEach(e=>freq[e.src]=(freq[e.src]||0)+1);
+    const top=Object.entries(freq).sort((a,b)=>b[1]-a[1])[0];
+    document.getElementById('jt-top').textContent=SRC_LABELS[top[0]]||top[0];
+  }
+
+  // List
+  const l=document.getElementById('jlist');
+  if(!filtered.length){
+    l.innerHTML=`<div class="jempty"><div class="jempty-icon">◎</div><div class="jempty-t">${jFilter==='all'?'Noch keine Analysen gespeichert':'Keine Einträge für diese Quelle'}</div><div class="jempty-s">${jFilter==='all'?'Starte deine erste Analyse — sie wird automatisch hier gespeichert.':'Wechsle den Filter oder analysiere eine Nachricht von dieser Person.'}</div></div>`;
+    return;
+  }
+
+  l.innerHTML=filtered.map(e=>{
+    const d=new Date(e.date);
+    const dateStr=d.toLocaleDateString('de-DE',{weekday:'short',day:'numeric',month:'short'});
+    const timeStr=d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+    return`<div class="jentry" id="je_${e.id}">
+      <div class="jentry-head" onclick="toggleEntry('${e.id}')">
+        <div class="jentry-meta">
+          <div class="jentry-top">
+            <span class="jentry-date">${dateStr} · ${timeStr}</span>
+            <span class="jsrc-chip">${SRC_LABELS[e.src]||e.src}</span>
+            ${e.tags.slice(0,2).map(t=>`<span class="jtag">${t}</span>`).join('')}
+          </div>
+          <div class="jentry-feeling"><em>${e.feeling||'–'}</em></div>
+          <div class="jentry-preview">${e.msgPreview||''}</div>
+        </div>
+        <span class="jentry-arrow">▶</span>
+      </div>
+      <div class="jentry-body">
+        ${e.observation?`<div class="jentry-section"><div class="js-label">👁 Beobachtung</div><div class="js-text">${e.observation}</div></div>`:''}
+        ${e.feeling?`<div class="jentry-section"><div class="js-label">♥ Gefühl</div><div class="js-text">${e.feeling}</div></div>`:''}
+        ${e.need?`<div class="jentry-section"><div class="js-label">◎ Bedürfnis</div><div class="js-text">${e.need}</div></div>`:''}
+        ${e.response?`<div class="jentry-section"><div class="js-label">✦ GFK-Antwort</div><div class="jentry-resp">${e.response}</div></div>`:''}
+        ${e.triggers&&e.triggers.length?`<div class="jentry-section"><div class="js-label">⚡ Trigger</div><div class="js-text">${e.triggers.join(' · ')}</div></div>`:''}
+        <div style="display:flex;gap:6px;margin-top:10px;align-items:center">
+          <button class="btn-sm" onclick="reloadEntry('${e.id}')">↺ Neu analysieren</button>
+          <button class="btn-sm pr" onclick="shareEntry('${e.id}')">↗ Teilen</button>
+          <button class="jdel" onclick="deleteEntry('${e.id}')">Löschen</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleEntry(id){
+  const el=document.getElementById('je_'+id);
+  if(el)el.classList.toggle('open');
+}
+function filterJournal(btn,src){
+  jFilter=src;
+  document.querySelectorAll('.jfilter .chip').forEach(c=>c.classList.remove('act'));
+  btn.classList.add('act');
+  renderJournal();
+}
+function deleteEntry(id){
+  const entries=loadJournalData().filter(e=>e.id!==id);
+  saveJournalData(entries);
+  renderJournal();
+  showToast('Eintrag gelöscht');
+}
+function clearJournal(){
+  if(!confirm('Alle Einträge löschen? Das kann nicht rückgängig gemacht werden.'))return;
+  localStorage.removeItem(JK);
+  renderJournal();
+  document.getElementById('step-4').querySelector('.step-num').textContent='◎';
+  showToast('Verlauf gelöscht');
+}
+function exportJournal(){
+  const entries=loadJournalData();
+  if(!entries.length){showToast('Keine Einträge zum Exportieren');return;}
+  const json=JSON.stringify(entries,null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='resonanz-verlauf-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  URL.revokeObjectURL(url);
+  showToast('Export gestartet ✓');
+}
+function reloadEntry(id){
+  const e=loadJournalData().find(x=>x.id===id);
+  if(!e)return;
+  document.getElementById('msgIn').value=e.msgPreview;
+  S.src=e.src;
+  document.querySelectorAll('#screen-1 .chip').forEach(c=>{c.classList.remove('act');if(c.onclick&&c.onclick.toString().includes("'"+e.src+"'"))c.classList.add('act');});
+  goStep(1);
+  showToast('Eintrag geladen — erneut analysieren ✓');
+}
+function shareEntry(id){
+  const e=loadJournalData().find(x=>x.id===id);
+  if(!e)return;
+  const txt=[e.feeling&&'Gefühl: '+e.feeling,e.need&&'Bedürfnis: '+e.need,e.response&&'\nMeine GFK-Antwort:\n'+e.response].filter(Boolean).join('\n');
+  openShare(txt);
+}
+function calcStreak(entries){
+  if(!entries.length)return 0;
+  const today=new Date().toDateString();
+  const days=new Set(entries.map(e=>new Date(e.date).toDateString()));
+  let streak=0,d=new Date();
+  while(days.has(d.toDateString())){streak++;d.setDate(d.getDate()-1);}
+  return streak;
+}
+
+// ── Auto-save wired into renderAnalysis directly ──
+// (saveEntry called at end of renderAnalysis below)
+
+// ── Beziehungskarte ───────────────────────────────
+const MK='resonanz_map';
+const MAP_COLORS={
+  nourishing:{fill:'#4A9B7F',light:'rgba(74,155,127,.13)',text:'#2A6B54'},
+  challenging:{fill:'#C47B3A',light:'rgba(196,123,58,.13)',text:'#8A5520'},
+  draining:{fill:'#B05050',light:'rgba(176,80,80,.13)',text:'#7A2828'},
+  neutral:{fill:'#8A9890',light:'rgba(138,152,144,.1)',text:'#5A6860'}
+};
+const SRC_TO_KEY={partner:'partner',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
+
+let mapNodes=[];
+let mapNextId=1;
+let mapDragging=null,mapDragOX=0,mapDragOY=0;
+let mapSelected=null;
+let mapCvs,mapCtx,mapW=0,mapH=0,mapCX=0,mapCY=0;
+let mapReady=false;
+
+function loadMapNodes(){
+  try{return JSON.parse(localStorage.getItem(MK)||'[]');}catch{return[];}
+}
+function saveMapNodes(){
+  try{localStorage.setItem(MK,JSON.stringify(mapNodes));}catch{}
+}
+
+// Derive quality from journal entries for a source
+function deriveQuality(entries){
+  if(!entries.length)return'neutral';
+  const avgEnergy=entries.reduce((s,e)=>s+(e.energy||50),0)/entries.length;
+  const avgConflict=entries.reduce((s,e)=>s+(e.conflictScore||20),0)/entries.length;
+  if(avgEnergy>60&&avgConflict<35)return'nourishing';
+  if(avgConflict>55)return'draining';
+  if(avgConflict>30||avgEnergy<45)return'challenging';
+  return'nourishing';
+}
+
+function syncMapFromJournal(){
+  const all=loadJournalData();
+  // Group by src
+  const bySrc={};
+  all.forEach(e=>{
+    if(!bySrc[e.src])bySrc[e.src]=[];
+    bySrc[e.src].push(e);
+  });
+
+  // For each src: update or create node
+  Object.entries(bySrc).forEach(([src,entries])=>{
+    const name=SRC_TO_KEY[src]||src;
+    const avgEnergy=Math.round(entries.reduce((s,e)=>s+(e.energy||50),0)/entries.length);
+    const recentTriggers=entries.filter(e=>e.triggers&&e.triggers.length>0).length;
+    const conflictScore=Math.round((recentTriggers/entries.length)*100);
+    const importance=Math.min(100,Math.round(30+(entries.length*5)));
+    const quality=deriveQuality(entries.map(e=>({...e,energy:avgEnergy,conflictScore})));
+
+    let node=mapNodes.find(n=>n.src===src);
+    if(node){
+      // Update data but keep position
+      node.importance=importance;
+      node.energy=avgEnergy;
+      node.conflict=conflictScore;
+      node.quality=quality;
+      node.analysisCount=entries.length;
+      node.lastDate=entries[0].date;
+      node.r=Math.max(14,Math.min(30,(importance/100)*22+10));
+    } else {
+      // New node — place it at a distance
+      const angle=(mapNodes.length*1.1)+0.3;
+      const dist=mapCX?mapCX*(.45+Math.random()*.25):120;
+      mapNodes.push({
+        id:mapNextId++,src,name,type:name,
+        quality,importance,energy:avgEnergy,conflict:conflictScore,
+        analysisCount:entries.length,lastDate:entries[0].date,
+        note:'',
+        x:mapCX?mapCX+dist*Math.cos(angle):0,
+        y:mapCY?mapCY+dist*Math.sin(angle):0,
+        r:Math.max(14,Math.min(30,(importance/100)*22+10))
+      });
+    }
+  });
+
+  // Mark max used id
+  mapNodes.forEach(n=>{if(n.id>=mapNextId)mapNextId=n.id+1;});
+  saveMapNodes();
+}
+
+function initMap(){
+  if(mapReady)return;
+  mapCvs=document.getElementById('map-canvas');
+  mapCtx=mapCvs.getContext('2d');
+  mapReady=true;
+  resizeMap();
+  bindMapEvents();
+}
+
+function resizeMap(){
+  if(!mapCvs)return;
+  const pr=window.devicePixelRatio||1;
+  mapW=document.getElementById('mapWrap').offsetWidth;
+  mapH=Math.max(360,Math.min(500,mapW*.68));
+  mapCvs.width=mapW*pr;mapCvs.height=mapH*pr;
+  mapCvs.style.width=mapW+'px';mapCvs.style.height=mapH+'px';
+  mapCtx.scale(pr,pr);
+  mapCX=mapW/2;mapCY=mapH/2;
+
+  // Position unplaced nodes
+  mapNodes.forEach((n,i)=>{
+    if(!n.x||!n.y){
+      const dist=mapCX*(.35+Math.random()*.4);
+      const angle=(i/mapNodes.length)*Math.PI*2;
+      n.x=mapCX+dist*Math.cos(angle);
+      n.y=mapCY+dist*Math.sin(angle);
+    }
+  });
+}
+
+function drawMap(){
+  if(!mapCtx)return;
+  mapCtx.clearRect(0,0,mapW,mapH);
+
+  // Background
+  mapCtx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--bg')||'#F2EDE5';
+  mapCtx.fillRect(0,0,mapW,mapH);
+
+  // Rings
+  const maxR=Math.min(mapCX,mapCY)*.85;
+  [{r:maxR*.28,l:'Kern'},{r:maxR*.57,l:'Nah'},{r:maxR*.83,l:'Peripher'}].forEach(({r,l})=>{
+    mapCtx.beginPath();mapCtx.arc(mapCX,mapCY,r,0,Math.PI*2);
+    mapCtx.strokeStyle='rgba(42,71,64,.1)';mapCtx.lineWidth=.5;
+    mapCtx.setLineDash([3,6]);mapCtx.stroke();mapCtx.setLineDash([]);
+    mapCtx.fillStyle='rgba(138,152,144,.3)';
+    mapCtx.font='10px sans-serif';mapCtx.textAlign='left';
+    mapCtx.fillText(l,mapCX+r*Math.cos(-.5)+3,mapCY+r*Math.sin(-.5));
+  });
+
+  // Connection lines
+  mapNodes.forEach(n=>{
+    const c=MAP_COLORS[n.quality];
+    const dist=Math.hypot(n.x-mapCX,n.y-mapCY);
+    const closeness=1-Math.min(1,dist/(Math.min(mapCX,mapCY)*.85));
+    const alpha=.12+closeness*.3;
+    mapCtx.beginPath();mapCtx.moveTo(mapCX,mapCY);mapCtx.lineTo(n.x,n.y);
+    mapCtx.strokeStyle=c.fill;mapCtx.globalAlpha=alpha;
+    mapCtx.lineWidth=closeness*3+.4;
+    if(n.conflict>50){mapCtx.setLineDash([5,4]);}
+    mapCtx.stroke();mapCtx.setLineDash([]);mapCtx.globalAlpha=1;
+  });
+
+  // Nodes
+  mapNodes.forEach(n=>{
+    const c=MAP_COLORS[n.quality];
+    const isSel=mapSelected&&mapSelected.id===n.id;
+
+    if(isSel){
+      mapCtx.beginPath();mapCtx.arc(n.x,n.y,n.r+7,0,Math.PI*2);
+      mapCtx.fillStyle=c.light;mapCtx.fill();
+    }
+
+    mapCtx.beginPath();mapCtx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    mapCtx.fillStyle=c.fill;mapCtx.fill();
+
+    mapCtx.beginPath();mapCtx.arc(n.x,n.y,n.r,0,Math.PI*2);
+    mapCtx.strokeStyle=isSel?'rgba(255,255,255,.9)':'rgba(255,255,255,.2)';
+    mapCtx.lineWidth=isSel?2:.5;mapCtx.stroke();
+
+    // Conflict dot
+    if(n.conflict>40){
+      mapCtx.beginPath();mapCtx.arc(n.x+n.r*.65,n.y-n.r*.65,4.5,0,Math.PI*2);
+      mapCtx.fillStyle='#E8A030';mapCtx.fill();
+    }
+
+    // Initials
+    const sur=getComputedStyle(document.documentElement).getPropertyValue('--sur')||'#FDFAF7';
+    mapCtx.fillStyle=sur;
+    mapCtx.font=`500 ${Math.max(10,n.r*.54)}px sans-serif`;
+    mapCtx.textAlign='center';mapCtx.textBaseline='middle';
+    mapCtx.fillText(n.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase(),n.x,n.y);
+
+    // Analysis count badge
+    if(n.analysisCount>0){
+      mapCtx.fillStyle=c.fill;
+      mapCtx.beginPath();mapCtx.arc(n.x-n.r*.65,n.y-n.r*.65,7,0,Math.PI*2);mapCtx.fill();
+      mapCtx.fillStyle=sur;
+      mapCtx.font='500 8px sans-serif';mapCtx.textAlign='center';mapCtx.textBaseline='middle';
+      mapCtx.fillText(Math.min(99,n.analysisCount),n.x-n.r*.65,n.y-n.r*.65);
+    }
+
+    // Name
+    const tx=getComputedStyle(document.documentElement).getPropertyValue('--tx')||'#18281F';
+    mapCtx.fillStyle=tx;mapCtx.font='400 11px sans-serif';
+    mapCtx.textAlign='center';mapCtx.textBaseline='top';
+    mapCtx.fillText(n.name,n.x,n.y+n.r+4);
+  });
+
+  // Center Ich
+  const tx=getComputedStyle(document.documentElement).getPropertyValue('--tx')||'#18281F';
+  const sur=getComputedStyle(document.documentElement).getPropertyValue('--sur')||'#FDFAF7';
+  mapCtx.beginPath();mapCtx.arc(mapCX,mapCY,22,0,Math.PI*2);
+  mapCtx.fillStyle=tx;mapCtx.fill();
+  mapCtx.fillStyle=sur;
+  mapCtx.font='500 13px sans-serif';mapCtx.textAlign='center';mapCtx.textBaseline='middle';
+  mapCtx.fillText('Ich',mapCX,mapCY);
+}
+
+function bindMapEvents(){
+  function getMapPos(e){
+    const rect=mapCvs.getBoundingClientRect();
+    const touch=e.touches?e.touches[0]:e;
+    return{x:touch.clientX-rect.left,y:touch.clientY-rect.top};
+  }
+  function hitMapNode(px,py){return mapNodes.find(n=>Math.hypot(n.x-px,n.y-py)<n.r+8);}
+
+  let pdX=0,pdY=0;
+  mapCvs.addEventListener('pointerdown',e=>{
+    const{x,y}=getMapPos(e);pdX=x;pdY=y;
+    const n=hitMapNode(x,y);
+    if(n){mapDragging=n;mapDragOX=x-n.x;mapDragOY=y-n.y;mapCvs.style.cursor='grabbing';}
+    else{mapSelected=null;document.getElementById('mapDetail').style.display='none';}
+  });
+  mapCvs.addEventListener('pointermove',e=>{
+    const{x,y}=getMapPos(e);
+    if(mapDragging){mapDragging.x=x-mapDragOX;mapDragging.y=y-mapDragOY;drawMap();}
+    else mapCvs.style.cursor=hitMapNode(x,y)?'grab':'default';
+  });
+  mapCvs.addEventListener('pointerup',e=>{
+    const{x,y}=getMapPos(e);
+    if(mapDragging){
+      const moved=Math.hypot(x-pdX,y-pdY)>5;
+      if(!moved){mapSelected=mapDragging;showMapDetail(mapSelected);}
+      else saveMapNodes();
+      mapDragging=null;mapCvs.style.cursor='default';drawMap();
+    }
+  });
+}
+
+function showMapDetail(n){
+  const p=document.getElementById('mapDetail');
+  const c=MAP_COLORS[n.quality];
+  const qlabels={nourishing:'Nährend',challenging:'Herausfordernd',draining:'Belastend',neutral:'Neutral'};
+  const dist=Math.hypot(n.x-mapCX,n.y-mapCY);
+  const proximity=Math.round((1-Math.min(1,dist/(Math.min(mapCX,mapCY)*.85)))*100);
+  const lastDate=n.lastDate?new Date(n.lastDate).toLocaleDateString('de-DE',{day:'numeric',month:'short'}):'–';
+
+  p.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:28px;height:28px;border-radius:50%;background:${c.fill};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:white;flex-shrink:0">${n.name.slice(0,2).toUpperCase()}</div>
+      <div><div style="font-size:14px;font-weight:500;color:var(--tx)">${n.name}</div>
+      <div style="font-size:10.5px;color:var(--txs)">${n.analysisCount||0} Analysen · zuletzt ${lastDate}</div></div>
+    </div>
+    <div style="display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:10px;background:${c.light};color:${c.text};margin-bottom:8px">${qlabels[n.quality]}</div>
+    <div class="map-dp-lbl">Nähe (Position)</div>
+    <div class="map-bar"><div class="map-bar-fill" style="width:${proximity}%;background:${c.fill}"></div></div>
+    <div class="map-dp-lbl">Energiebilanz</div>
+    <div class="map-bar"><div class="map-bar-fill" style="width:${n.energy||50}%;background:${(n.energy||50)>50?'#4A9B7F':'#B05050'}"></div></div>
+    ${n.conflict>20?`<div class="map-dp-lbl">Konfliktfrequenz</div>
+    <div class="map-bar"><div class="map-bar-fill" style="width:${n.conflict}%;background:#E8A030"></div></div>`:''}
+    ${n.note?`<div class="map-dp-lbl">Notiz</div><div style="font-size:12px;color:var(--txs)">${n.note}</div>`:''}
+    <div class="map-actions">
+      <button class="map-btn" onclick="showMapAddPanel(${n.id})">Bearbeiten</button>
+      <button class="map-btn" onclick="filterJournal4Map('${n.src}')">Verlauf</button>
+      <button class="map-btn del" onclick="deleteMapNode(${n.id})">✕</button>
+    </div>`;
+  p.style.display='block';
+}
+
+function deleteMapNode(id){
+  mapNodes=mapNodes.filter(n=>n.id!==id);
+  mapSelected=null;document.getElementById('mapDetail').style.display='none';
+  saveMapNodes();drawMap();
+}
+
+function filterJournal4Map(src){
+  goStep(4);
+  const chip=[...document.querySelectorAll('.jfilter .chip')].find(c=>c.onclick&&c.getAttribute('onclick')&&c.getAttribute('onclick').includes("'"+src+"'"));
+  if(chip){filterJournal(chip,src);}
+}
+
+function showMapAddPanel(editId){
+  const p=document.getElementById('mapAddPanel');
+  const editN=editId?mapNodes.find(n=>n.id===editId):null;
+  p.innerHTML=`
+    <div style="font-size:13px;font-weight:500;color:var(--tx);margin-bottom:4px">${editN?'Bearbeiten':'Person hinzufügen'}</div>
+    <div><label class="mlbl">Name</label><input class="fi" id="mp-name" value="${editN?editN.name:''}" placeholder="Name …"></div>
+    <div><label class="mlbl">Qualität</label><select class="fi" id="mp-qual">
+      <option value="nourishing"${editN&&editN.quality==='nourishing'?' selected':''}>Nährend</option>
+      <option value="challenging"${editN&&editN.quality==='challenging'?' selected':''}>Herausfordernd</option>
+      <option value="draining"${editN&&editN.quality==='draining'?' selected':''}>Belastend</option>
+      <option value="neutral"${editN&&editN.quality==='neutral'?' selected':''}>Neutral</option>
+    </select></div>
+    <div><label class="mlbl">Notiz</label><input class="fi" id="mp-note" value="${editN?editN.note||'':''}" placeholder="Optional …"></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-primary" style="flex:1;padding:7px 10px;font-size:13px" onclick="saveMapNode(${editN?editN.id:'null'})">${editN?'Speichern':'Hinzufügen'}</button>
+      <button class="btn btn-ghost" style="padding:7px 10px;font-size:13px" onclick="document.getElementById('mapAddPanel').style.display='none'">✕</button>
+    </div>`;
+  p.style.display='flex';
+  setTimeout(()=>document.getElementById('mp-name').focus(),50);
+}
+
+function saveMapNode(editId){
+  const name=document.getElementById('mp-name').value.trim();if(!name)return;
+  const quality=document.getElementById('mp-qual').value;
+  const note=document.getElementById('mp-note').value.trim();
+  if(editId!==null&&editId!=='null'){
+    const n=mapNodes.find(x=>x.id===editId);
+    if(n)Object.assign(n,{name,quality,note});
+  } else {
+    const angle=Math.random()*Math.PI*2;
+    const dist=mapCX*(.38+Math.random()*.38);
+    const importance=40;
+    mapNodes.push({id:mapNextId++,src:'other',name,type:name,quality,importance,energy:60,conflict:20,analysisCount:0,lastDate:null,note,
+      x:mapCX+dist*Math.cos(angle),y:mapCY+dist*Math.sin(angle),r:Math.max(14,Math.min(30,(importance/100)*22+10))});
+  }
+  document.getElementById('mapAddPanel').style.display='none';
+  mapSelected=null;document.getElementById('mapDetail').style.display='none';
+  saveMapNodes();drawMap();
+}
+
+function resetMapPositions(){
+  mapNodes.forEach((n,i)=>{
+    const dist=Math.min(mapCX,mapCY)*(.35+Math.random()*.42);
+    const angle=(i/mapNodes.length)*Math.PI*2;
+    n.x=mapCX+dist*Math.cos(angle);n.y=mapCY+dist*Math.sin(angle);
+  });
+  saveMapNodes();drawMap();
+}
+
+function buildMapInsight(){
+  const all=loadJournalData();
+  if(!all.length){document.getElementById('mapInsight').innerHTML='Noch keine Analysen — starte mit einer Nachricht um deine Beziehungskarte zu füllen.';return;}
+  const bySrc={};
+  all.forEach(e=>{if(!bySrc[e.src])bySrc[e.src]=[];bySrc[e.src].push(e);});
+
+  const insights=[];
+  // Most analyzed
+  const top=Object.entries(bySrc).sort((a,b)=>b[1].length-a[1].length)[0];
+  const topName=SRC_TO_KEY[top[0]]||top[0];
+  insights.push(`Du hast am häufigsten Nachrichten von <strong>${topName}</strong> verarbeitet (${top[1].length}×).`);
+
+  // Draining relationships
+  const draining=Object.entries(bySrc).filter(([src,entries])=>{
+    const ac=entries.filter(e=>e.triggers&&e.triggers.length>0).length;
+    return (ac/entries.length)>.5&&entries.length>=2;
+  }).map(([src])=>SRC_TO_KEY[src]||src);
+  if(draining.length)insights.push(`Hohe Trigger-Frequenz bei: <strong>${draining.join(', ')}</strong>.`);
+
+  // Improvement: last 3 vs first 3 triggers for top src
+  const topEntries=top[1];
+  if(topEntries.length>=6){
+    const early=topEntries.slice(-3).filter(e=>e.triggers&&e.triggers.length>0).length;
+    const recent=topEntries.slice(0,3).filter(e=>e.triggers&&e.triggers.length>0).length;
+    if(recent<early)insights.push(`Bei <strong>${topName}</strong> wurden weniger Trigger ausgelöst als früher — das ist echtes Wachstum.`);
+  }
+
+  document.getElementById('mapInsight').innerHTML=insights.join(' ');
+}
+
+function openMapScreen(){
+  if(!mapReady)initMap();
+  else resizeMap();
+  mapNodes=loadMapNodes();
+  mapNextId=Math.max(1,...mapNodes.map(n=>n.id+1),1);
+  syncMapFromJournal();
+  buildMapInsight();
+  drawMap();
+}
+
+// ── Update goStep for step 5 ──────────────────────
+const _gsPrev=goStep;
+goStep=function(n){
+  if(n===5){
+    S.curStep=5;
+    document.querySelectorAll('.step').forEach((s,i)=>{s.classList.remove('act','done');if(i<4)s.classList.add('done');});
+    document.getElementById('step-5').classList.add('act');document.getElementById('step-5').classList.remove('done');
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
+    document.getElementById('screen-5').classList.add('act');
+    openMapScreen();window.scrollTo({top:0,behavior:'smooth'});return;
+  }
+  _gsPrev(n);
+};
+
+window.addEventListener('resize',()=>{if(S.curStep===5)resizeMap();});
+let deferredInstall=null;
+
+// Version bump — clears old dismissed flag so banner shows again
+const PWA_VERSION='v3-external';
+if(localStorage.getItem('pwa_version')!==PWA_VERSION){
+  localStorage.removeItem('pwa_dismissed');
+  localStorage.setItem('pwa_version',PWA_VERSION);
+}
+
+window.addEventListener('beforeinstallprompt',e=>{
+  e.preventDefault();
+  deferredInstall=e;
+  // Show banner unless user explicitly dismissed this version
+  if(!localStorage.getItem('pwa_dismissed')){
+    document.getElementById('installBar').classList.add('show');
+  }
+});
+
+function doInstall(){
+  if(!deferredInstall){
+    // Fallback: guide user manually
+    showToast('Drei-Punkte-Menü → App installieren');
+    return;
+  }
+  deferredInstall.prompt();
+  deferredInstall.userChoice.then(choice=>{
+    if(choice.outcome==='accepted'){
+      showToast('Resonanz wird installiert ✓');
+    }
+    deferredInstall=null;
+    dismissInstall();
+  });
+}
+function dismissInstall(){
+  document.getElementById('installBar').classList.remove('show');
+  localStorage.setItem('pwa_dismissed','1');
+}
+window.addEventListener('appinstalled',()=>{
+  showToast('Resonanz installiert ✓');
+  document.getElementById('installBar').classList.remove('show');
+});
+
+// ── Apply incoming share data to UI ──────────────
+function applyPendingShare(){
+  if(window.__pendingShareText){
+    const txt=window.__pendingShareText;
+    delete window.__pendingShareText;
+    document.getElementById('msgIn').value=txt;
+    switchITab('text',document.querySelectorAll('.itab')[0]);
+    showShareBanner('text',1);
+  }
+  if(window.__pendingShareFiles&&window.__pendingShareFiles.length){
+    const files=window.__pendingShareFiles;
+    delete window.__pendingShareFiles;
+    switchITab('audio',document.querySelectorAll('.itab')[1]);
+    addFiles(files);
+    showShareBanner('audio',files.length);
+  }
+}
+function showShareBanner(type,count){
+  let b=document.getElementById('share-recv-banner');
+  if(!b){
+    b=document.createElement('div');b.id='share-recv-banner';
+    b.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:var(--p);color:white;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:500;z-index:700;display:flex;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(42,71,64,.3);animation:fadeUp .3s ease;white-space:nowrap';
+    document.body.appendChild(b);
+  }
+  const msg=type==='audio'
+    ?`📥 ${count} Audionachricht${count>1?'en':''} empfangen`
+    :'📥 Textnachricht empfangen';
+  b.innerHTML=`<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:15px;margin-left:4px">✕</button>`;
+  setTimeout(()=>{if(b&&b.parentElement)b.remove();},5000);
+}
+setTimeout(applyPendingShare,400);
+// Also re-check when SW signals completion
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',e=>{
+    if(e.data&&e.data.type==='share-received')applyPendingShare();
+  });
+}
+
+// ── Check PWA status for messenger strip ─────────
+(function(){
+  const isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
+  if(!isPWA){
+    const hint=document.getElementById('share-install-hint');
+    if(hint)hint.style.display='block';
+  }
+})();
+
+// ── Init: load saved keys ────────────────────────
+(function(){
+  if(localStorage.getItem(KEY_STORE)){
+    showKeysSavedState(true);
+    promptPinAndLoad();
+  }
+})();
+
+// ── Init journal badge ────────────────────────────
+(function(){
+  const n=loadJournalData().length;
+  if(n>0)document.getElementById('step-4').querySelector('.step-num').textContent=n<=99?n:'◎';
+})();
+</script>
+</body>
+</html>

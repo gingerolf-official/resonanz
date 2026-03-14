@@ -2,14 +2,17 @@
   "name": "Resonanz",
   "short_name": "Resonanz",
   "description": "GFK-gestützte Nachrichtenverarbeitung",
-  "start_url": "./",
-  "id": "./",
+  "start_url": "./app.html",
+  "id": "./app.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F2EDE5",
   "theme_color": "#2A4740",
   "orientation": "portrait-primary",
-  "categories": ["lifestyle", "health"],
+  "categories": [
+    "lifestyle",
+    "health"
+  ],
   "icons": [
     {
       "src": "./icon-192.png",
@@ -37,7 +40,7 @@
     }
   ],
   "share_target": {
-    "action": "./?share",
+    "action": "./app.html?share",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
@@ -47,7 +50,15 @@
       "files": [
         {
           "name": "audio",
-          "accept": ["audio/*", ".opus", ".mp3", ".m4a", ".wav", ".ogg", ".aac"]
+          "accept": [
+            "audio/*",
+            ".opus",
+            ".mp3",
+            ".m4a",
+            ".wav",
+            ".ogg",
+            ".aac"
+          ]
         }
       ]
     }
