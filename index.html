@@ -384,13 +384,20 @@ audio{width:100%;height:28px;margin-top:6px}
 .istep-n{width:20px;height:20px;border-radius:50%;background:var(--p);color:white;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 
 /* ─── INSTALL BANNER ─── */
-.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;background:var(--p);color:white;font-size:13px}
+.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:linear-gradient(135deg,#2A4740,#38594F);color:white;font-size:13px;animation:slideDown .3s ease}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
 .install-bar.show{display:flex}
-.install-bar-text{display:flex;align-items:center;gap:8px}
-.install-bar-acts{display:flex;gap:6px;flex-shrink:0}
-.install-btn{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border:none}
+.install-bar-text{display:flex;align-items:center;gap:10px;flex:1}
+.install-bar-icon{font-size:22px;flex-shrink:0}
+.install-bar-copy{display:flex;flex-direction:column;gap:1px}
+.install-bar-title{font-size:13.5px;font-weight:500;color:white}
+.install-bar-sub{font-size:11px;color:rgba(255,255,255,.6)}
+.install-bar-acts{display:flex;gap:7px;flex-shrink:0}
+.install-btn{padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border:none;transition:all .15s}
 .install-btn-yes{background:white;color:var(--p)}
-.install-btn-no{background:transparent;color:rgba(255,255,255,.6);border:.5px solid rgba(255,255,255,.3)}
+.install-btn-yes:hover{background:#F0EDE8;transform:scale(1.03)}
+.install-btn-no{background:transparent;color:rgba(255,255,255,.55);border:.5px solid rgba(255,255,255,.25);font-size:12px}
+.install-btn-no:hover{color:rgba(255,255,255,.85)}
 
 /* ─── JOURNAL ─── */
 .jfilter{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -697,8 +704,11 @@ audio{width:100%;height:28px;margin-top:6px}
   <!-- Install banner (auto, Chrome only) -->
   <div class="install-bar" id="installBar">
     <div class="install-bar-text">
-      <span style="font-size:20px">📲</span>
-      <span><strong>Resonanz installieren</strong> — für WhatsApp-Teilen-Integration</span>
+      <div class="install-bar-icon">📲</div>
+      <div class="install-bar-copy">
+        <div class="install-bar-title">Resonanz installieren</div>
+        <div class="install-bar-sub">Dann erscheint die App im Teilen-Menü von WhatsApp & Co.</div>
+      </div>
     </div>
     <div class="install-bar-acts">
       <button class="install-btn install-btn-yes" onclick="doInstall()">Installieren</button>
@@ -1095,6 +1105,12 @@ function setModel(id,lbl,type){
 
 // ── Settings drawer ───────────────────────────────
 function openSettings(){document.getElementById('settingsOv').classList.add('open')}
+function showInstallGuide(){
+  const el=document.getElementById('installGuideOv');
+  if(el)el.classList.add('open');
+  else if(deferredInstall)doInstall();
+  else showToast('Im Browser-Menü: "Zum Startbildschirm hinzufügen"');
+}
 function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
 
 
@@ -2253,7 +2269,7 @@ window.addEventListener('resize',()=>{if(S.curStep===5)resizeMap();});
 let deferredInstall=null;
 
 // Version bump — clears old dismissed flag so banner shows again
-const PWA_VERSION='v3-external';
+const PWA_VERSION='v4-clean';
 if(localStorage.getItem('pwa_version')!==PWA_VERSION){
   localStorage.removeItem('pwa_dismissed');
   localStorage.setItem('pwa_version',PWA_VERSION);
