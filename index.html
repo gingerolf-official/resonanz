@@ -646,39 +646,20 @@ audio{width:100%;height:28px;margin-top:6px}
     <div class="drawer-section">
       <div class="drawer-label">Audio-Transkription</div>
       <div class="drawer-field">
-        <div class="field-label">Engine</div>
-        <select class="fi" id="weng" onchange="updateWhisperEngineUI()">
-          <option value="openai">Whisper via Browser (direkt)</option>
-          <option value="proxy">Whisper via eigenem Backend ⭐</option>
-          <option value="local">Whisper.cpp (lokal)</option>
+        <div class="field-label">Sprache der Sprachnachrichten</div>
+        <select class="fi" id="wlang">
+          <option value="de">Deutsch</option>
+          <option value="en">Englisch</option>
+          <option value="tr">Türkisch</option>
+          <option value="ar">Arabisch</option>
+          <option value="ru">Russisch</option>
+          <option value="es">Spanisch</option>
+          <option value="fr">Französisch</option>
+          <option value="it">Italienisch</option>
+          <option value="auto">Automatisch erkennen</option>
         </select>
+        <div style="font-size:11px;color:var(--txs);margin-top:4px">Transkription läuft über deinen Backend-Server — kein separater Whisper-Key nötig.</div>
       </div>
-      <div id="wbackend-row" style="display:none" class="drawer-field">
-        <div class="field-label">Backend URL <span style="font-size:10px;color:var(--txs)">(von Vercel nach Deploy)</span></div>
-        <input class="fi" type="text" id="wbackend" placeholder="https://dein-projekt.vercel.app/api/transcribe">
-        <div style="font-size:11px;color:var(--txs);margin-top:3px">Key liegt sicher auf dem Server — nicht im Browser</div>
-      </div>
-      <div class="drawer-field">
-        <div class="field-label">OpenAI Key für Whisper <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
-        <input class="fi" type="password" id="wkey" placeholder="sk-proj-… oder sk-…" autocomplete="off" oninput="updateKeyStatus('whisper',this.value)">
-        <div style="font-size:11px;margin-top:3px" id="key-status-whisper"></div>
-        <div style="font-size:11px;color:var(--txs);margin-top:3px">Nur für Transkription · unabhängig vom KI-Modell</div>
-      </div>
-      <div class="drawer-field" id="proxy-field">
-        <div class="field-label" style="display:flex;align-items:center;justify-content:space-between">
-          <span>Proxy-URL <span style="font-size:10px;color:var(--acc);font-weight:500">Pflicht für Browser</span></span>
-          <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p);text-decoration:none;font-size:10.5px">Einrichten ↗</a>
-        </div>
-        <input class="fi" type="text" id="proxyUrl" placeholder="https://dein-worker.workers.dev" autocomplete="off" oninput="updateProxyStatus(this.value)">
-        <div style="font-size:11px;margin-top:3px" id="proxy-status"></div>
-        <div style="font-size:11px;color:var(--txs);margin-top:3px;line-height:1.5">Kostenloser Cloudflare Worker nötig — <strong>whisper-worker.js</strong> herunterladen und deployen</div>
-      </div>
-      <div class="drawer-field">
-        <div class="field-label">Sprache (leer = automatisch)</div>
-        <input class="fi" type="text" id="wlang" placeholder="de / en / auto">
-      </div>
-    </div>
-
     <div class="drawer-section">
       <div class="drawer-label">Ausgabe-Module</div>
       <div id="toggle-list">
@@ -1326,12 +1307,7 @@ function updatePillStatus() {
 // ── Toggle switches ───────────────────────────────
 function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
 
-function updateWhisperEngineUI(){
-  const eng=document.getElementById('weng').value;
-  document.getElementById('wbackend-row').style.display=eng==='proxy'?'':'none';
-  const wkeyRow=document.getElementById('wkey')?.closest('.drawer-field');
-  if(wkeyRow)wkeyRow.style.display=eng==='proxy'?'none':'';
-}
+function updateWhisperEngineUI(){}
 
 // ── Output language ───────────────────────────────
 function pickLang(el,code,name){
@@ -1466,88 +1442,32 @@ function setStat(id,s){
 
 // ── Transcription ─────────────────────────────────
 async function transcribeAll(){
-  const pend=S.afiles.filter(f=>f.status==='p');if(!pend.length)return;
-  const eng=document.getElementById('weng').value;
-  const lang=document.getElementById('wlang').value.trim()||'de';
-  // Whisper key: dedicated field (always visible), fallback to OpenAI LLM key
-  // Keys werden serverseitig verwendet — kein Key im Browser nötig
+  const pend=S.afiles.filter(f=>f.status==='p');
+  if(!pend.length)return;
+  const wlangEl=document.getElementById('wlang');
+  const lang=(wlangEl?wlangEl.value:'')||'de';
   const tb=document.getElementById('transcribeBtn');
   if(tb){tb.disabled=true;tb.classList.add('ld');}
-
   for(const af of pend){
     setStat(af.id,'t');
-    let res=null;
-    let usedDemo=false;
-
-    // Route based on engine setting
-    const eng=document.getElementById('weng').value;
-
-    if(eng==='proxy'){
-      // Own Vercel backend — most reliable
-      const backendUrl=document.getElementById('wbackend').value.trim();
-      if(!backendUrl){
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Backend-URL fehlt — bitte in ⚙ Einstellungen eintragen.');
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-      try{
-        res=await trViaBackend(af.file,backendUrl,lang);
-      }catch(err){
-        let msg=err.message||String(err);
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Backend Fehler: '+msg);
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-    } else if(eng==='openai'&&wkey){
-      // Direct browser request (may hit CORS on some setups)
-      try{
-        res=await trOpenAI(af.file,lang);
-      }catch(err){
-        let msg=err.message||String(err);
-        try{const j=JSON.parse(msg);msg=j.error?.message||msg;}catch{}
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Whisper Fehler: '+msg);
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-            if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-    // Ollama / lokal: kein Key nötig
-    if(!res){
-      res=simTR(af.name);
-      usedDemo=true;
+    try{
+      const res=await trOpenAI(af.file,lang);
+      af.status='d';
+      S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
+      S.transcripts.push({id:af.id,name:af.name,url:af.url,...res,demo:false});
+    }catch(err){
+      af.status='e';
+      let msg=err.message||String(err);
+      try{const j=JSON.parse(msg);msg=j.error?.message||msg;}catch{}
+      showAPIError('Transkription: '+msg);
     }
-
-async function trViaBackend(file,backendUrl,lang){
-  let sendFile=file;
-  if(file.name.toLowerCase().endsWith('.opus')){
-    sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
-  }
-  const fd=new FormData();
-  fd.append('file',sendFile);
-  fd.append('model','whisper-1');
-  fd.append('response_format','verbose_json');
-  fd.append('timestamp_granularities[]','word');
-  if(lang&&lang!=='auto')fd.append('language',lang);
-  const r=await fetch(backendUrl,{method:'POST',body:fd});
-  if(!r.ok){const e=await r.text();throw new Error(e);}
-  const d=await r.json();
-  const words=(d.words||[]).map(w=>({word:w.word.trim(),start:w.start,end:w.end,prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14}));
-  return{text:d.text,words};
-}
-
-    af.status='d';af.transcript=res;
-    S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
-    S.transcripts.push({id:af.id,name:af.name,url:af.url,...res,demo:usedDemo});
-    setStat(af.id,'d');
+    setStat(af.id,af.status);
     renderTRs();
   }
-
   if(tb){tb.disabled=false;tb.classList.remove('ld');}
 }
+
+
 async function trOpenAI(file,lang){
   // .opus → .ogg (same codec, Whisper doesn't accept .opus filename)
   let sendFile=file;
