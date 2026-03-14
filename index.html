@@ -2528,15 +2528,7 @@ if('serviceWorker' in navigator){
   }
 })();
 
-// ── Init: load saved keys if stored ─────────────
-(function(){
-  if(localStorage.getItem(KEY_STORE)){
-    showKeysSavedState(true);
-    promptPinAndLoad();
-  }
-})();
-
-// ── Init: show PIN if keys are stored ───────────────
+// ── Init: load saved keys ────────────────────────
 (function(){
   if(localStorage.getItem(KEY_STORE)){
     showKeysSavedState(true);
