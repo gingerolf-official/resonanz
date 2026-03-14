@@ -1138,12 +1138,7 @@ function updatePillStatus(){}
 // ── Toggle switches ───────────────────────────────
 function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
 
-function updateWhisperEngineUI(){
-  const eng=document.getElementById('weng').value;
-  document.getElementById('wbackend-row').style.display=eng==='proxy'?'':'none';
-  const wkeyRow=document.getElementById('wkey')?.closest('.drawer-field');
-  if(wkeyRow)wkeyRow.style.display=eng==='proxy'?'none':'';
-}
+function updateWhisperEngineUI(){}// simplified
 
 // ── Output language ───────────────────────────────
 function pickLang(el,code,name){
@@ -1278,90 +1273,28 @@ function setStat(id,s){
 
 // ── Transcription ─────────────────────────────────
 async function transcribeAll(){
-  const pend=S.afiles.filter(f=>f.status==='p');if(!pend.length)return;
-  const eng=document.getElementById('weng').value;
-  const lang=document.getElementById('wlang').value.trim()||'de';
-  // Whisper key: dedicated field (always visible), fallback to OpenAI LLM key
-  // Keys werden serverseitig verwendet — kein Key im Browser nötig
+  const pend=S.afiles.filter(f=>f.status==='p');
+  if(!pend.length)return;
+  const lang=(document.getElementById('wlang')||{value:'de'}).value||'de';
   const tb=document.getElementById('transcribeBtn');
   if(tb){tb.disabled=true;tb.classList.add('ld');}
-
   for(const af of pend){
     setStat(af.id,'t');
-    let res=null;
-    let usedDemo=false;
-
-    // Route based on engine setting
-    const eng=document.getElementById('weng').value;
-
-    if(eng==='proxy'){
-      // Own Vercel backend — most reliable
-      const backendUrl=document.getElementById('wbackend').value.trim();
-      if(!backendUrl){
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Backend-URL fehlt — bitte in ⚙ Einstellungen eintragen.');
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-      try{
-        res=await trViaBackend(af.file,backendUrl,lang);
-      }catch(err){
-        let msg=err.message||String(err);
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Backend Fehler: '+msg);
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-    } else if(eng==='openai'&&wkey){
-      // Direct browser request (may hit CORS on some setups)
-      try{
-        res=await trOpenAI(af.file,lang);
-      }catch(err){
-        let msg=err.message||String(err);
-        try{const j=JSON.parse(msg);msg=j.error?.message||msg;}catch{}
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Whisper Fehler: '+msg);
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-            if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-    // Ollama / lokal: kein Key nötig
-    if(!res){
-      res=simTR(af.name);
-      usedDemo=true;
+    try{
+      const res=await trOpenAI(af.file,lang);
+      af.status='d';
+      S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
+      S.transcripts.push({id:af.id,name:af.name,url:af.url,...res,demo:false});
+    }catch(err){
+      af.status='e';
+      showAPIError('Transkription: '+(err.message||err));
     }
-
-async function trViaBackend(file,backendUrl,lang){
-  let sendFile=file;
-  if(file.name.toLowerCase().endsWith('.opus')){
-    sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
-  }
-  const fd=new FormData();
-  fd.append('file',sendFile);
-  fd.append('model','whisper-1');
-  fd.append('response_format','verbose_json');
-  fd.append('timestamp_granularities[]','word');
-  if(lang&&lang!=='auto')fd.append('language',lang);
-  const r=await fetch(backendUrl,{method:'POST',body:fd});
-  if(!r.ok){const e=await r.text();throw new Error(e);}
-  const d=await r.json();
-  const words=(d.words||[]).map(w=>({word:w.word.trim(),start:w.start,end:w.end,prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14}));
-  return{text:d.text,words};
-}
-
-    af.status='d';af.transcript=res;
-    S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
-    S.transcripts.push({id:af.id,name:af.name,url:af.url,...res,demo:usedDemo});
-    setStat(af.id,'d');
+    setStat(af.id,af.status);
     renderTRs();
   }
-
   if(tb){tb.disabled=false;tb.classList.remove('ld');}
 }
 async function trOpenAI(file,lang){
-  // .opus → .ogg (same codec, Whisper doesn't accept .opus filename)
   let sendFile=file;
   if(file.name.toLowerCase().endsWith('.opus')){
     sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
@@ -1373,7 +1306,7 @@ async function trOpenAI(file,lang){
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
-    throw new Error(e.error||`Transkription Fehler ${r.status}`);
+    throw new Error(e.error||'Transkription Fehler '+r.status);
   }
   const d=await r.json();
   const words=(d.words||[]).map(w=>({
@@ -1382,7 +1315,6 @@ async function trOpenAI(file,lang){
   }));
   return{text:d.text,words};
 }
-function simTR(){
   const base=[
     {word:'Ich',start:.1,end:.4,prob:.98},{word:'wollte',start:.4,end:.75,prob:.95},{word:'dir',start:.8,end:.95,prob:.97},
     {word:'sagen',start:1.25,end:1.6,prob:.94},{word:'dass',start:1.7,end:1.9,prob:.92},
@@ -1503,7 +1435,7 @@ function getKey(id){const el=document.getElementById(id);return el?el.value.trim
 function hasValidKey(){
   return true; // Keys are on the server
 }
-function hasWhisperKey(){return getKey('wkey').length>10||getKey('okey').length>10;}
+function hasWhisperKey(){return true;} // key is on server
 
 // ── API calls — über Backend (keys nie im Browser) ──
 async function callAPI(prompt){
@@ -1535,11 +1467,7 @@ async function callAPI(prompt){
 function parseJSON(raw){try{return JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{return null;}}
 
 // ── Fehler-UI ─────────────────────────────────────
-function showKeyError(){
-  const names={claude:'Anthropic API-Key (sk-ant-…)',gpt4:'OpenAI API-Key (sk-proj-…)',llama:'Ollama lokal (kein Key nötig — läuft Ollama?)',mistral:'Ollama lokal (kein Key nötig — läuft Ollama?)'};
-  const name=names[S.model]||S.model;
-  showAPIError('Kein '+name+' eingetragen.',true);
-}
+function showKeyError(){showAPIError('Server nicht erreichbar — bitte vercel.app URL prüfen.');}
 function showAPIError(msg, isKeyError=false){
   const old=document.getElementById('api-error-card');if(old)old.remove();
   const card=document.createElement('div');
