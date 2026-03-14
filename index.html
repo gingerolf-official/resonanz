@@ -802,7 +802,7 @@ audio{width:100%;height:28px;margin-top:6px}
             <div class="drop" id="adrop" onclick="document.getElementById('aIn').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="doDrop(event)">
               <div class="drop-icon">🎙</div>
               <div class="drop-title">Audionachrichten auswählen</div>
-              <div class="drop-sub">Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG · max 25 MB</div>
+              <div class="drop-sub">Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG, OPUS · beliebige Länge</div>
             </div>
             <input type="file" id="aIn" accept="audio/*" multiple onchange="addFiles(this.files)" style="display:none">
             <div class="alist" id="alist"></div>
@@ -1155,9 +1155,9 @@ function saveKeys() {
   const data = {
     ckey: document.getElementById('ckey').value.trim(),
     okey: document.getElementById('okey').value.trim(),
-    wkey: document.getElementById('wkey').value.trim(),
+    wkey: '', // whisper key handled by backend
     olurl: document.getElementById('olurl').value.trim(),
-    proxyUrl: document.getElementById('proxyUrl')?.value.trim()||'',
+    
     model: S.model,
     mtype: S.mtype,
     ts: Date.now()
@@ -1182,10 +1182,9 @@ function loadKeys(pin) {
     if (!data.ckey && !data.okey && !data.wkey) return false;
     if (data.ckey) document.getElementById('ckey').value = data.ckey;
     if (data.okey) document.getElementById('okey').value = data.okey;
-    if (data.wkey) document.getElementById('wkey').value = data.wkey;
+    // wkey handled by backend
     if (data.olurl) document.getElementById('olurl').value = data.olurl;
-    if (data.proxyUrl) { const el=document.getElementById('proxyUrl'); if(el) el.value=data.proxyUrl; }
-    if (data.proxyUrl) { const pe=document.getElementById('proxyUrl'); if(pe)pe.value=data.proxyUrl; }
+
     if (data.model) setModel(data.model,
       {claude:'Claude Sonnet',gpt4:'GPT-4o',llama:'Llama 3.2',mistral:'Mistral 7B'}[data.model]||data.model,
       data.mtype||'cloud');
@@ -1567,7 +1566,12 @@ document.getElementById('wpop-in').addEventListener('keydown',e=>{if(e.key==='En
 function getText(){
   if(S.tab==='text')return document.getElementById('msgIn').value.trim();
   if(S.tab==='chat')return document.getElementById('chatIn').value.trim();
-  if(S.tab==='audio')return S.transcripts.map(t=>`[${t.name}]: ${t.text}`).join('\n\n');
+  if(S.tab==='audio'){
+    if(!S.transcripts.length)return '';
+    if(S.transcripts.length===1)return S.transcripts[0].text;
+    // Multiple files: label each and combine
+    return S.transcripts.map((t,i)=>`[Nachricht ${i+1} – ${t.name}]:\n${t.text}`).join('\n\n');
+  }
   return'';
 }
 
@@ -2525,6 +2529,14 @@ if('serviceWorker' in navigator){
 })();
 
 // ── Init: load saved keys if stored ─────────────
+(function(){
+  if(localStorage.getItem(KEY_STORE)){
+    showKeysSavedState(true);
+    promptPinAndLoad();
+  }
+})();
+
+// ── Init: show PIN if keys are stored ───────────────
 (function(){
   if(localStorage.getItem(KEY_STORE)){
     showKeysSavedState(true);
