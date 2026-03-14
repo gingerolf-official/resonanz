@@ -384,13 +384,20 @@ audio{width:100%;height:28px;margin-top:6px}
 .istep-n{width:20px;height:20px;border-radius:50%;background:var(--p);color:white;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 
 /* ─── INSTALL BANNER ─── */
-.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;background:var(--p);color:white;font-size:13px}
+.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:linear-gradient(135deg,#2A4740,#38594F);color:white;font-size:13px;animation:slideDown .3s ease}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
 .install-bar.show{display:flex}
-.install-bar-text{display:flex;align-items:center;gap:8px}
-.install-bar-acts{display:flex;gap:6px;flex-shrink:0}
-.install-btn{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border:none}
+.install-bar-text{display:flex;align-items:center;gap:10px;flex:1}
+.install-bar-icon{font-size:22px;flex-shrink:0}
+.install-bar-copy{display:flex;flex-direction:column;gap:1px}
+.install-bar-title{font-size:13.5px;font-weight:500;color:white}
+.install-bar-sub{font-size:11px;color:rgba(255,255,255,.6)}
+.install-bar-acts{display:flex;gap:7px;flex-shrink:0}
+.install-btn{padding:7px 14px;border-radius:20px;font-size:12.5px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;border:none;transition:all .15s}
 .install-btn-yes{background:white;color:var(--p)}
-.install-btn-no{background:transparent;color:rgba(255,255,255,.6);border:.5px solid rgba(255,255,255,.3)}
+.install-btn-yes:hover{background:#F0EDE8;transform:scale(1.03)}
+.install-btn-no{background:transparent;color:rgba(255,255,255,.55);border:.5px solid rgba(255,255,255,.25)}
+.install-btn-no:hover{color:rgba(255,255,255,.85)}
 
 /* ─── JOURNAL ─── */
 .jfilter{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
@@ -748,14 +755,17 @@ audio{width:100%;height:28px;margin-top:6px}
   <!-- Install banner (auto, Chrome only) -->
   <div class="install-bar" id="installBar">
     <div class="install-bar-text">
-      <span style="font-size:20px">📲</span>
-      <span><strong>Resonanz installieren</strong> — für WhatsApp-Teilen-Integration</span>
+      <div class="install-bar-icon">📲</div>
+      <div class="install-bar-copy">
+        <div class="install-bar-title">Resonanz installieren</div>
+        <div class="install-bar-sub">Dann erscheint die App im Teilen-Menü von WhatsApp &amp; Co.</div>
+      </div>
     </div>
     <div class="install-bar-acts">
       <button class="install-btn install-btn-yes" onclick="doInstall()">Installieren</button>
       <button class="install-btn install-btn-no" onclick="dismissInstall()">Später</button>
     </div>
-  </div>
+  
 
   <!-- Header -->
   <div class="hdr">
@@ -1147,6 +1157,12 @@ function setModel(id,lbl,type){
 
 // ── Settings drawer ───────────────────────────────
 function openSettings(){document.getElementById('settingsOv').classList.add('open')}
+function showInstallGuide(){
+  var el=document.getElementById('installGuideOv');
+  if(el)el.classList.add('open');
+  else if(deferredInstall)doInstall();
+  else showToast('Im Browser-Menü: Zum Startbildschirm hinzufügen');
+}
 function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
 
 // ── Key persistence (XOR + PIN, localStorage) ────
@@ -1341,12 +1357,7 @@ function updatePillStatus() {
 // ── Toggle switches ───────────────────────────────
 function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
 
-function updateWhisperEngineUI(){
-  const eng=document.getElementById('weng').value;
-  document.getElementById('wbackend-row').style.display=eng==='proxy'?'':'none';
-  const wkeyRow=document.getElementById('wkey')?.closest('.drawer-field');
-  if(wkeyRow)wkeyRow.style.display=eng==='proxy'?'none':'';
-}
+function updateWhisperEngineUI(){}
 
 // ── Output language ───────────────────────────────
 function pickLang(el,code,name){
@@ -1481,90 +1492,28 @@ function setStat(id,s){
 
 // ── Transcription ─────────────────────────────────
 async function transcribeAll(){
-  const pend=S.afiles.filter(f=>f.status==='p');if(!pend.length)return;
-  const eng=document.getElementById('weng').value;
-  const lang=document.getElementById('wlang').value.trim()||'de';
-  // Whisper key: dedicated field (always visible), fallback to OpenAI LLM key
-  // Keys werden serverseitig verwendet — kein Key im Browser nötig
+  const pend=S.afiles.filter(f=>f.status==='p');
+  if(!pend.length)return;
+  const lang=(document.getElementById('wlang')||{value:'de'}).value||'de';
   const tb=document.getElementById('transcribeBtn');
   if(tb){tb.disabled=true;tb.classList.add('ld');}
-
   for(const af of pend){
     setStat(af.id,'t');
-    let res=null;
-    let usedDemo=false;
-
-    // Route based on engine setting
-    const eng=document.getElementById('weng').value;
-
-    if(eng==='proxy'){
-      // Own Vercel backend — most reliable
-      const backendUrl=document.getElementById('wbackend').value.trim();
-      if(!backendUrl){
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Backend-URL fehlt — bitte in ⚙ Einstellungen eintragen.');
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-      try{
-        res=await trViaBackend(af.file,backendUrl,lang);
-      }catch(err){
-        let msg=err.message||String(err);
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Backend Fehler: '+msg);
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-    } else if(eng==='openai'&&wkey){
-      // Direct browser request (may hit CORS on some setups)
-      try{
-        res=await trOpenAI(af.file,lang);
-      }catch(err){
-        let msg=err.message||String(err);
-        try{const j=JSON.parse(msg);msg=j.error?.message||msg;}catch{}
-        af.status='e';setStat(af.id,'e');
-        showAPIError('Whisper Fehler: '+msg);
-        if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-            if(tb){tb.disabled=false;tb.classList.remove('ld');}
-        return;
-      }
-    // Ollama / lokal: kein Key nötig
-    if(!res){
-      res=simTR(af.name);
-      usedDemo=true;
+    try{
+      const res=await trOpenAI(af.file,lang);
+      af.status='d';
+      S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
+      S.transcripts.push({id:af.id,name:af.name,url:af.url,...res,demo:false});
+    }catch(err){
+      af.status='e';
+      showAPIError('Transkription: '+(err.message||err));
     }
-
-async function trViaBackend(file,backendUrl,lang){
-  let sendFile=file;
-  if(file.name.toLowerCase().endsWith('.opus')){
-    sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
-  }
-  const fd=new FormData();
-  fd.append('file',sendFile);
-  fd.append('model','whisper-1');
-  fd.append('response_format','verbose_json');
-  fd.append('timestamp_granularities[]','word');
-  if(lang&&lang!=='auto')fd.append('language',lang);
-  const r=await fetch(backendUrl,{method:'POST',body:fd});
-  if(!r.ok){const e=await r.text();throw new Error(e);}
-  const d=await r.json();
-  const words=(d.words||[]).map(w=>({word:w.word.trim(),start:w.start,end:w.end,prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14}));
-  return{text:d.text,words};
-}
-
-    af.status='d';af.transcript=res;
-    S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
-    S.transcripts.push({id:af.id,name:af.name,url:af.url,...res,demo:usedDemo});
-    setStat(af.id,'d');
+    setStat(af.id,af.status);
     renderTRs();
   }
-
   if(tb){tb.disabled=false;tb.classList.remove('ld');}
 }
 async function trOpenAI(file,lang){
-  // .opus → .ogg (same codec, Whisper doesn't accept .opus filename)
   let sendFile=file;
   if(file.name.toLowerCase().endsWith('.opus')){
     sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
@@ -1576,7 +1525,7 @@ async function trOpenAI(file,lang){
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
-    throw new Error(e.error||`Transkription Fehler ${r.status}`);
+    throw new Error(e.error||'Transkription Fehler '+r.status);
   }
   const d=await r.json();
   const words=(d.words||[]).map(w=>({
@@ -1585,6 +1534,7 @@ async function trOpenAI(file,lang){
   }));
   return{text:d.text,words};
 }
+
 function simTR(){
   const base=[
     {word:'Ich',start:.1,end:.4,prob:.98},{word:'wollte',start:.4,end:.75,prob:.95},{word:'dir',start:.8,end:.95,prob:.97},
