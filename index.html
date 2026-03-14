@@ -653,50 +653,20 @@ audio{width:100%;height:28px;margin-top:6px}
     <div class="drawer-section">
       <div class="drawer-label">Audio-Transkription</div>
       <div class="drawer-field">
-        <div class="field-label">Engine</div>
-        <select class="fi" id="weng" onchange="updateWhisperEngineUI()">
-          <option value="openai">Whisper via Browser (direkt)</option>
-          <option value="proxy">Whisper via eigenem Backend ⭐</option>
-          <option value="local">Whisper.cpp (lokal)</option>
+        <div class="field-label">Sprache der Aufnahme</div>
+        <select class="fi" id="wlang">
+          <option value="de">Deutsch</option>
+          <option value="en">Englisch</option>
+          <option value="tr">Türkisch</option>
+          <option value="ar">Arabisch</option>
+          <option value="ru">Russisch</option>
+          <option value="es">Spanisch</option>
+          <option value="fr">Französisch</option>
+          <option value="it">Italienisch</option>
+          <option value="auto">Automatisch erkennen</option>
         </select>
+        <div style="font-size:11px;color:var(--txs);margin-top:4px">Welche Sprache wird in den Audios gesprochen? Die Ausgabe bleibt in der gewählten Ausgabe-Sprache.</div>
       </div>
-      <div id="wbackend-row" style="display:none" class="drawer-field">
-        <div class="field-label">Backend URL <span style="font-size:10px;color:var(--txs)">(von Vercel nach Deploy)</span></div>
-        <input class="fi" type="text" id="wbackend" placeholder="https://dein-projekt.vercel.app/api/transcribe">
-        <div style="font-size:11px;color:var(--txs);margin-top:3px">Key liegt sicher auf dem Server — nicht im Browser</div>
-      </div>
-      <div class="drawer-field">
-        <div class="field-label">OpenAI Key für Whisper <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
-        <input class="fi" type="password" id="wkey" placeholder="sk-proj-… oder sk-…" autocomplete="off" oninput="updateKeyStatus('whisper',this.value)">
-        <div style="font-size:11px;margin-top:3px" id="key-status-whisper"></div>
-        <div style="font-size:11px;color:var(--txs);margin-top:3px">Nur für Transkription · unabhängig vom KI-Modell</div>
-      </div>
-      <div class="drawer-field" id="proxy-field">
-        <div class="field-label" style="display:flex;align-items:center;justify-content:space-between">
-          <span>Proxy-URL <span style="font-size:10px;color:var(--acc);font-weight:500">Pflicht für Browser</span></span>
-          <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p);text-decoration:none;font-size:10.5px">Einrichten ↗</a>
-        </div>
-        <input class="fi" type="text" id="proxyUrl" placeholder="https://dein-worker.workers.dev" autocomplete="off" oninput="updateProxyStatus(this.value)">
-        <div style="font-size:11px;margin-top:3px" id="proxy-status"></div>
-        <div style="font-size:11px;color:var(--txs);margin-top:3px;line-height:1.5">Kostenloser Cloudflare Worker nötig — <strong>whisper-worker.js</strong> herunterladen und deployen</div>
-      </div>
-      <div class="drawer-field">
-        <div class="field-label">Sprache (leer = automatisch)</div>
-        <input class="fi" type="text" id="wlang" placeholder="de / en / auto">
-      </div>
-      <div class="drawer-field">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-          <div class="field-label">Cloudflare Worker URL (Proxy)</div>
-          <a href="https://workers.cloudflare.com" target="_blank" style="font-size:10.5px;color:var(--p);text-decoration:none">Einrichten ↗</a>
-        </div>
-        <input class="fi" type="text" id="proxyUrl" placeholder="https://whisper.DEINNAME.workers.dev" oninput="updateProxyStatus(this.value)">
-        <div id="proxy-status" style="font-size:11px;margin-top:3px"></div>
-        <div id="proxy-hint" style="font-size:11px;color:var(--txs);margin-top:4px;line-height:1.5;display:none">
-          Nötig für Brave, Firefox und manche Chrome-Versionen.<br>
-          Kostenlos · 2 Minuten · <strong>whisper-worker.js</strong> auf GitHub herunterladen
-        </div>
-      </div>
-    </div>
 
     <div class="drawer-section">
       <div class="drawer-label">Ausgabe-Module</div>
@@ -1334,16 +1304,6 @@ function showCorsError(){
   card.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function updateProxyStatus(val){
-  const el=document.getElementById('proxy-status');
-  const hint=document.getElementById('proxy-hint');
-  if(!el)return;
-  if(!val){el.textContent='';if(hint)hint.style.display='block';return;}
-  const ok=val.startsWith('https://')&&val.includes('workers.dev');
-  el.textContent=ok?'✓ Format sieht korrekt aus':'⚠ Sollte mit https://...workers.dev enden';
-  el.style.color=ok?'var(--p)':'var(--acc)';
-  if(hint)hint.style.display='none';
-}
 
 function updatePillStatus() {
   const pill = document.getElementById('mpill');
