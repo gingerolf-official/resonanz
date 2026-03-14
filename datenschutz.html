@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Datenschutzerklärung — Resonanz</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--p:#2A4740;--bg:#F2EDE4;--sur:#FDFAF6;--bd:rgba(42,71,64,.1);--tx:#0E1A14;--txm:#4A5E55;--txs:#8A9C94}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);-webkit-font-smoothing:antialiased}
+nav{padding:16px 32px;display:flex;align-items:center;justify-content:space-between;background:var(--sur);border-bottom:.5px solid var(--bd)}
+.nav-brand{font-family:'Cormorant Garamond',serif;font-size:1.35rem;color:var(--p);text-decoration:none}
+.nav-back{font-size:13px;color:var(--txm);text-decoration:none}
+.nav-back:hover{color:var(--p)}
+main{max-width:680px;margin:0 auto;padding:64px 24px 100px}
+h1{font-family:'Cormorant Garamond',serif;font-size:2.5rem;font-weight:400;color:var(--p);margin-bottom:12px}
+.updated{font-size:13px;color:var(--txs);margin-bottom:48px}
+h2{font-size:14px;font-weight:500;color:var(--p);letter-spacing:.08em;text-transform:uppercase;margin:36px 0 10px}
+h3{font-size:15px;font-weight:500;color:var(--tx);margin:24px 0 8px}
+p{font-size:15px;color:var(--txm);line-height:1.75;margin-bottom:10px}
+ul{padding-left:20px;margin-bottom:10px}
+li{font-size:15px;color:var(--txm);line-height:1.75}
+a{color:var(--p)}
+.highlight{background:rgba(42,71,64,.06);border-left:3px solid var(--p);border-radius:0 8px 8px 0;padding:14px 18px;margin:20px 0;font-size:14px;color:var(--txm);line-height:1.7}
+.notice{background:var(--sur);border:.5px solid var(--bd);border-radius:12px;padding:16px 20px;margin-top:40px;font-size:13px;color:var(--txs);line-height:1.65}
+footer{text-align:center;padding:32px;font-size:13px;color:var(--txs)}
+footer a{color:var(--txs);text-decoration:none;margin:0 12px}
+footer a:hover{color:var(--p)}
+</style>
+</head>
+<body>
+<nav>
+  <a href="./landing.html" class="nav-brand">Resonanz</a>
+  <a href="./landing.html" class="nav-back">← Zurück</a>
+</nav>
+<main>
+  <h1>Datenschutz&shy;erklärung</h1>
+  <p class="updated">Stand: März 2026</p>
+
+  <div class="highlight">
+    <strong>Das Wichtigste zuerst:</strong> Resonanz speichert deine Nachrichten und Audioaufnahmen nicht. Sie werden nur zur Analyse an externe KI-Dienste gesendet und danach nicht aufbewahrt. Dein GFK-Tagebuch und deine Einstellungen liegen ausschließlich lokal auf deinem Gerät.
+  </div>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>DEIN VORNAME NACHNAME<br>DEINE STRASSE, DEINE STADT<br>E-Mail: <a href="mailto:DEINE@EMAIL.DE">DEINE@EMAIL.DE</a></p>
+
+  <h2>2. Welche Daten wir verarbeiten</h2>
+
+  <h3>Textnachrichten und Audiodateien</h3>
+  <p>Nachrichten und Sprachaufnahmen die du zur Analyse eingibst werden an unseren Server (Vercel, USA) und von dort an folgende KI-Dienste weitergeleitet:</p>
+  <ul>
+    <li><strong>Anthropic, Inc.</strong> (San Francisco, USA) — für die GFK-Analyse. Datenschutz: <a href="https://www.anthropic.com/privacy" target="_blank">anthropic.com/privacy</a></li>
+    <li><strong>OpenAI, LLC</strong> (San Francisco, USA) — für die Transkription von Sprachnachrichten (Whisper). Datenschutz: <a href="https://openai.com/policies/privacy-policy" target="_blank">openai.com/policies/privacy-policy</a></li>
+  </ul>
+  <p>Diese Daten werden nach der Verarbeitung <strong>nicht gespeichert</strong>. Die Verarbeitung erfolgt ausschließlich auf deine aktive Anfrage hin (Art. 6 Abs. 1 lit. b DSGVO).</p>
+
+  <h3>Lokal gespeicherte Daten (auf deinem Gerät)</h3>
+  <p>Folgende Daten werden ausschließlich lokal in deinem Browser gespeichert (localStorage) — kein Server sieht diese Daten:</p>
+  <ul>
+    <li>GFK-Tagebuch (deine Analysen, lokal und verschlüsselt)</li>
+    <li>Beziehungskarte (deine Kontakte und Einstellungen)</li>
+    <li>API-Keys (falls gespeichert, XOR-verschlüsselt mit deiner PIN)</li>
+    <li>App-Einstellungen (Sprache, Modell, etc.)</li>
+  </ul>
+  <p>Du kannst diese Daten jederzeit in den App-Einstellungen löschen.</p>
+
+  <h3>Serverlogs</h3>
+  <p>Unser Hosting-Anbieter Vercel (Vercel Inc., USA) speichert technische Zugriffsdaten (IP-Adresse, Zeitstempel, aufgerufene URL) für bis zu 30 Tage. Dies dient der Sicherheit und Fehlerbehebung. Vercel ist nach dem EU-US Data Privacy Framework zertifiziert.</p>
+
+  <h2>3. Datenübertragung in Drittländer</h2>
+  <p>Die genannten Dienste (Anthropic, OpenAI, Vercel) sitzen in den USA. Die Übertragung erfolgt auf Basis von Standardvertragsklauseln (Art. 46 DSGVO) oder dem EU-US Data Privacy Framework.</p>
+
+  <h2>4. Deine Rechte</h2>
+  <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit. Da wir keine personenbezogenen Daten dauerhaft speichern, ist eine Auskunft in der Regel nicht möglich — es existieren keine Daten über dich auf unseren Systemen.</p>
+  <p>Beschwerden kannst du bei der zuständigen Datenschutzaufsichtsbehörde einreichen.</p>
+
+  <h2>5. Cookies</h2>
+  <p>Diese Website verwendet keine Tracking-Cookies und keine Analyse-Tools (kein Google Analytics, kein Facebook Pixel). Es werden ausschließlich technisch notwendige Browserspeicher-Technologien (localStorage) verwendet.</p>
+
+  <h2>6. Minderjährige</h2>
+  <p>Resonanz richtet sich nicht bewusst an Personen unter 16 Jahren. Solltest du unter 16 Jahre alt sein, nutze die App bitte nur mit Zustimmung deiner Eltern.</p>
+
+  <div class="notice">
+    <strong>Hinweis:</strong> Ersetze alle GROSSBUCHSTABEN-Platzhalter mit deinen echten Angaben. Für eine vollständig rechtssichere Datenschutzerklärung empfehle ich <a href="https://datenschutz-generator.de" target="_blank">datenschutz-generator.de</a> oder einen Rechtsanwalt für IT-Recht.
+  </div>
+</main>
+<footer>
+  <a href="./landing.html">Startseite</a>
+  <a href="./impressum.html">Impressum</a>
+  <a href="./index.html">App öffnen</a>
+</footer>
+</body>
+</html>

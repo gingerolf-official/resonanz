@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Resonanz — Versteh wirklich, was Nachrichten sagen. GFK-gestützte Analyse für Texte und Sprachnachrichten.">
+<title>Resonanz — Höre mit dem Herzen</title>
+<!-- Open Graph für WhatsApp/Telegram Vorschau -->
+<meta property="og:title" content="Resonanz — Höre mit dem Herzen">
+<meta property="og:description" content="Versteh wirklich was Nachrichten sagen. GFK-Analyse für Texte und Sprachnachrichten.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://DEINNAME.github.io/resonanz/landing.html">
+<meta name="twitter:card" content="summary">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0E1A14;--ink2:#2B3D34;--ink3:#4A5E55;--muted:#8A9C94;
+  --bg:#F2EDE4;--sur:#FDFAF6;--sur2:#EBE5DC;
+  --p:#2A4740;--pl:#38594F;
+  --acc:#B55A2C;--gold:#9A7A46;
+  --bd:rgba(42,71,64,.1);
+  --safe:env(safe-area-inset-bottom,0px);
+}
+html{scroll-behavior:smooth;font-size:16px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+
+/* ── NAV ── */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 32px;display:flex;align-items:center;justify-content:space-between;background:rgba(242,237,228,.88);backdrop-filter:blur(16px);border-bottom:.5px solid var(--bd)}
+.nav-brand{font-family:'Cormorant Garamond',serif;font-size:1.35rem;font-weight:400;color:var(--p);letter-spacing:-.02em}
+.nav-cta{padding:9px 20px;background:var(--p);color:white;border-radius:30px;font-size:13px;font-weight:500;text-decoration:none;transition:all .2s}
+.nav-cta:hover{background:var(--pl);transform:translateY(-1px)}
+
+/* ── HERO ── */
+.hero{min-height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:100px 24px 80px;position:relative;overflow:hidden}
+.hero-bg{position:absolute;inset:0;pointer-events:none}
+.hero-circle{position:absolute;border-radius:50%;opacity:.06}
+.hero-c1{width:600px;height:600px;background:var(--p);top:-100px;right:-150px}
+.hero-c2{width:400px;height:400px;background:var(--acc);bottom:-80px;left:-100px}
+.hero-c3{width:200px;height:200px;background:var(--gold);top:40%;left:10%}
+.hero-eyebrow{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:28px;animation:fadeUp .8s ease both}
+.hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(3rem,8vw,6rem);font-weight:300;color:var(--p);line-height:1.05;letter-spacing:-.03em;margin-bottom:28px;animation:fadeUp .8s .1s ease both}
+.hero h1 em{font-style:italic;color:var(--acc)}
+.hero-sub{font-size:clamp(15px,2.5vw,18px);color:var(--ink3);max-width:560px;line-height:1.8;margin:0 auto 48px;animation:fadeUp .8s .2s ease both}
+.hero-actions{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;animation:fadeUp .8s .3s ease both}
+.btn-primary{padding:14px 32px;background:var(--p);color:white;border-radius:40px;font-size:15px;font-weight:500;text-decoration:none;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
+.btn-primary:hover{background:var(--pl);transform:translateY(-2px);box-shadow:0 12px 32px rgba(42,71,64,.25)}
+.btn-ghost{padding:14px 28px;background:transparent;color:var(--ink3);border-radius:40px;font-size:15px;text-decoration:none;border:.5px solid var(--bd);transition:all .2s}
+.btn-ghost:hover{border-color:var(--p);color:var(--p);background:var(--sur2)}
+.hero-scroll{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);font-size:11px;letter-spacing:.1em;animation:bob 2.5s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+
+/* ── PROBLEM STRIP ── */
+.strip{background:var(--p);padding:48px 24px;text-align:center}
+.strip p{font-family:'Cormorant Garamond',serif;font-size:clamp(1.2rem,3vw,1.7rem);font-weight:300;color:rgba(255,255,255,.85);line-height:1.7;max-width:680px;margin:0 auto}
+.strip p em{font-style:italic;color:rgba(255,255,255,.55)}
+
+/* ── SECTION BASE ── */
+section{padding:100px 24px;max-width:1100px;margin:0 auto}
+.s-eyebrow{font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;display:flex;align-items:center;gap:10px}
+.s-eyebrow::after{content:'';flex:1;max-width:40px;height:.5px;background:var(--bd)}
+.s-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2rem,4vw,3.2rem);font-weight:400;color:var(--p);line-height:1.15;letter-spacing:-.02em;margin-bottom:20px}
+.s-title em{font-style:italic;color:var(--acc)}
+.s-lead{font-size:17px;color:var(--ink3);line-height:1.8;max-width:620px;margin-bottom:56px}
+
+/* ── HOW IT WORKS ── */
+.steps-flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0;position:relative}
+.step-item{padding:32px;border-left:.5px solid var(--bd);position:relative}
+.step-item:first-child{border-left:none}
+.step-num{font-family:'Cormorant Garamond',serif;font-size:3rem;font-weight:300;color:var(--bd);line-height:1;margin-bottom:16px}
+.step-icon{font-size:24px;margin-bottom:12px;display:block}
+.step-title{font-size:15px;font-weight:500;color:var(--p);margin-bottom:8px}
+.step-text{font-size:14px;color:var(--ink3);line-height:1.7}
+
+/* ── FEATURES ── */
+.features-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.feat{background:var(--sur);border:.5px solid var(--bd);border-radius:20px;padding:28px;transition:all .2s;cursor:default}
+.feat:hover{border-color:rgba(42,71,64,.25);transform:translateY(-3px);box-shadow:0 8px 32px rgba(42,71,64,.08)}
+.feat.large{grid-column:span 2}
+.feat-icon{font-size:20px;margin-bottom:14px;display:block}
+.feat-title{font-size:15px;font-weight:500;color:var(--p);margin-bottom:6px}
+.feat-text{font-size:13.5px;color:var(--ink3);line-height:1.65}
+.feat-tag{display:inline-block;font-size:10.5px;padding:3px 9px;border-radius:12px;background:rgba(42,71,64,.07);color:var(--p);margin-top:10px}
+
+/* ── QUOTE ── */
+.quote-section{background:var(--p);border-radius:28px;padding:64px 48px;text-align:center;margin:0 24px}
+.quote-text{font-family:'Cormorant Garamond',serif;font-size:clamp(1.3rem,3vw,2rem);font-weight:300;color:white;line-height:1.6;font-style:italic;margin-bottom:20px}
+.quote-sub{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.35)}
+
+/* ── FOR WHOM ── */
+.for-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.for-card{background:var(--sur);border:.5px solid var(--bd);border-radius:16px;padding:24px}
+.for-icon{font-size:22px;margin-bottom:10px;display:block}
+.for-title{font-size:14px;font-weight:500;color:var(--p);margin-bottom:6px}
+.for-text{font-size:13px;color:var(--ink3);line-height:1.6}
+
+/* ── PHONES MOCKUP ── */
+.mockup-section{padding:80px 24px;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.mockup-text .s-eyebrow{margin-bottom:12px}
+.phone-frame{width:260px;margin:0 auto;background:var(--ink);border-radius:36px;padding:12px;box-shadow:0 24px 80px rgba(14,26,20,.25)}
+.phone-screen{background:var(--bg);border-radius:26px;overflow:hidden}
+.phone-header{background:var(--sur);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:.5px solid var(--bd)}
+.ph-brand{font-family:'Cormorant Garamond',serif;font-size:1rem;color:var(--p)}
+.ph-pill{font-size:10px;padding:3px 8px;border-radius:10px;background:var(--sur2);color:var(--muted)}
+.phone-body{padding:16px;display:flex;flex-direction:column;gap:10px}
+.msg-bubble{background:white;border-radius:14px 14px 14px 4px;padding:11px 13px;font-size:12px;color:var(--ink2);line-height:1.5;border:.5px solid var(--bd)}
+.msg-bubble.out{background:var(--p);color:white;border-radius:14px 14px 4px 14px;align-self:flex-end;border:none}
+.gfk-card{background:rgba(42,71,64,.05);border-radius:12px;padding:12px;border:.5px solid rgba(42,71,64,.15)}
+.gfk-row{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:.5px solid rgba(42,71,64,.08);font-size:11px}
+.gfk-row:last-child{border:none}
+.gfk-ico{font-size:12px;flex-shrink:0;width:16px}
+.gfk-cat{font-size:9px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:1px}
+.gfk-val{font-size:11px;color:var(--ink2);line-height:1.4}
+
+/* ── TRUST ── */
+.trust-section{padding:60px 24px;background:var(--sur);border-top:.5px solid var(--bd);border-bottom:.5px solid var(--bd)}
+.trust-inner{max-width:800px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:32px;text-align:center}
+.trust-item{}
+.trust-n{font-family:'Cormorant Garamond',serif;font-size:2.8rem;font-weight:300;color:var(--p);line-height:1}
+.trust-l{font-size:13px;color:var(--muted);margin-top:4px}
+
+/* ── CTA FINAL ── */
+.cta-final{padding:120px 24px;text-align:center}
+.cta-final .s-title{font-size:clamp(2.5rem,5vw,4rem);margin-bottom:16px}
+.cta-final .s-lead{margin:0 auto 40px}
+.cta-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:20px}
+
+/* ── FOOTER ── */
+footer{padding:32px 24px;border-top:.5px solid var(--bd);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;max-width:1100px;margin:0 auto}
+.footer-brand{font-family:'Cormorant Garamond',serif;font-size:1.1rem;color:var(--p)}
+.footer-links{display:flex;gap:24px}
+.footer-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color .15s}
+.footer-links a:hover{color:var(--p)}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+.reveal.in{opacity:1;transform:translateY(0)}
+
+@media(max-width:720px){
+  .features-grid{grid-template-columns:1fr}
+  .feat.large{grid-column:span 1}
+  .mockup-section{grid-template-columns:1fr}
+  .trust-inner{grid-template-columns:1fr}
+  .steps-flow{grid-template-columns:1fr}
+  .step-item{border-left:none;border-top:.5px solid var(--bd)}
+  .step-item:first-child{border-top:none}
+  nav{padding:14px 20px}
+  .quote-section{padding:40px 24px;margin:0 16px}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-brand">Resonanz</div>
+  <a href="#start" class="nav-cta">App öffnen →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-bg">
+    <div class="hero-circle hero-c1"></div>
+    <div class="hero-circle hero-c2"></div>
+    <div class="hero-circle hero-c3"></div>
+  </div>
+  <p class="hero-eyebrow">Kommunikation · die heilt</p>
+  <h1>Nachrichten wirklich<br><em>verstehen.</em></h1>
+  <p class="hero-sub">Resonanz analysiert Texte und Sprachnachrichten mit GFK — und hilft dir, ruhig, klar und verbunden zu antworten. Statt aus dem Trigger heraus.</p>
+  <div class="hero-actions">
+    <a href="#start" class="btn-primary">✦ Jetzt ausprobieren</a>
+    <a href="#wie" class="btn-ghost">Wie es funktioniert</a>
+  </div>
+  <div class="hero-scroll">▾</div>
+</div>
+
+<!-- STRIP -->
+<div class="strip">
+  <p>Jeden Tag kommen Nachrichten, die dich irgendwie treffen.<br><em>Zu wenig Zeit. Zu viel Druck. Zu viele unausgesprochene Dinge.</em><br>Resonanz hilft dir, den Moment der Reaktion zu verlangsamen.</p>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="wie">
+  <div class="s-eyebrow">So funktioniert's</div>
+  <h2 class="s-title">Drei Schritte.<br><em>Eine neue Klarheit.</em></h2>
+  <div class="steps-flow reveal">
+    <div class="step-item">
+      <div class="step-num">01</div>
+      <span class="step-icon">📥</span>
+      <div class="step-title">Nachricht einlesen</div>
+      <div class="step-text">Text eintippen, Sprachnachricht hochladen oder direkt aus WhatsApp & Signal teilen. Mehrere Audios auf einmal — beliebige Länge.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">02</div>
+      <span class="step-icon">◎</span>
+      <div class="step-title">GFK-Analyse</div>
+      <div class="step-text">Die KI erkennt Beobachtung, Gefühl, Bedürfnis und Trigger. Du siehst, was wirklich gesagt wurde — hinter den Worten.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">03</div>
+      <span class="step-icon">✦</span>
+      <div class="step-title">Bewusst antworten</div>
+      <div class="step-text">Schreib deine spontane Antwort — Resonanz zeigt dir wie sie wirkt, was sie über dich verrät, und bietet bessere Alternativen.</div>
+    </div>
+    <div class="step-item">
+      <div class="step-num">04</div>
+      <span class="step-icon">◈</span>
+      <div class="step-title">Wachsen über Zeit</div>
+      <div class="step-text">Dein GFK-Tagebuch und die Beziehungskarte zeigen dir, welche Muster sich verändern — ohne Bewertung, ohne Score.</div>
+    </div>
+  </div>
+</section>
+
+<!-- PHONE MOCKUP -->
+<div class="mockup-section reveal">
+  <div class="mockup-text">
+    <div class="s-eyebrow">In der Praxis</div>
+    <h2 class="s-title">Aus dem Trigger heraus<br>in echte <em>Verbindung.</em></h2>
+    <p style="font-size:16px;color:var(--ink3);line-height:1.8;margin-bottom:24px">Eine WhatsApp-Sprachnachricht, drei Minuten — und du weißt nicht nur was dich getriggert hat, sondern auch warum, und wie du antworten kannst ohne es zu bereuen.</p>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0">🎙</span>
+        <span style="font-size:14px;color:var(--ink3)">Sprachnachrichten werden automatisch transkribiert — du musst gar nichts abtippen</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0">🔒</span>
+        <span style="font-size:14px;color:var(--ink3)">Deine Nachrichten bleiben privat — sie werden nicht gespeichert, nicht gelesen</span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <span style="font-size:16px;flex-shrink:0">🌍</span>
+        <span style="font-size:14px;color:var(--ink3)">10 Sprachen — egal in welcher Sprache die Nachricht kommt</span>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="phone-frame">
+      <div class="phone-screen">
+        <div class="phone-header">
+          <span class="ph-brand">Resonanz</span>
+          <span class="ph-pill">● Claude Sonnet</span>
+        </div>
+        <div class="phone-body">
+          <div class="msg-bubble">Du meldest dich nie von alleine. Ich frag mich langsam ob dir das überhaupt wichtig ist.</div>
+          <div class="gfk-card">
+            <div style="font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px">GFK-Analyse</div>
+            <div class="gfk-row">
+              <span class="gfk-ico">👁</span>
+              <div><div class="gfk-cat">Beobachtung</div><div class="gfk-val">Seltenere Kontaktaufnahme als erwartet</div></div>
+            </div>
+            <div class="gfk-row">
+              <span class="gfk-ico">♥</span>
+              <div><div class="gfk-cat">Gefühl</div><div class="gfk-val">Unsicherheit, Angst nicht wichtig zu sein</div></div>
+            </div>
+            <div class="gfk-row">
+              <span class="gfk-ico">◎</span>
+              <div><div class="gfk-cat">Bedürfnis</div><div class="gfk-val">Verbindung, Zugehörigkeit, Sicherheit</div></div>
+            </div>
+          </div>
+          <div class="msg-bubble out">Ich höre, dass dir Verbindung wichtig ist. Mir auch — ich war zuletzt in meiner eigenen Welt. Darf ich dich heute Abend anrufen?</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section>
+  <div class="s-eyebrow">Funktionen</div>
+  <h2 class="s-title">Alles was du<br><em>wirklich brauchst.</em></h2>
+  <div class="features-grid reveal">
+    <div class="feat">
+      <span class="feat-icon">🎙</span>
+      <div class="feat-title">Sprachnachrichten-Transkription</div>
+      <div class="feat-text">WhatsApp Audios direkt hochladen. Mehrere gleichzeitig, beliebige Länge. Automatische Transkription, klickbare Korrektur unsicherer Wörter.</div>
+      <span class="feat-tag">Whisper AI</span>
+    </div>
+    <div class="feat">
+      <span class="feat-icon">◎</span>
+      <div class="feat-title">GFK-Analyse in Sekunden</div>
+      <div class="feat-text">Beobachtung · Gefühl · Bedürfnis · Bitte — das Fundament gewaltfreier Kommunikation, automatisch aus jeder Nachricht extrahiert.</div>
+      <span class="feat-tag">Claude Sonnet</span>
+    </div>
+    <div class="feat">
+      <span class="feat-icon">🪞</span>
+      <div class="feat-title">Kommunikations-Training</div>
+      <div class="feat-text">Schreib deine spontane Antwort — Resonanz analysiert, was sie über dich verrät, wie sie beim Gegenüber ankommt, und schlägt bessere Alternativen vor.</div>
+    </div>
+    <div class="feat">
+      <span class="feat-icon">◈</span>
+      <div class="feat-title">Beziehungskarte</div>
+      <div class="feat-text">Eine visuelle Karte deiner wichtigsten Beziehungen — Nähe, Energiebilanz, Werte-Resonanz. Wächst automatisch aus deinen Analysen.</div>
+    </div>
+    <div class="feat">
+      <span class="feat-icon">📖</span>
+      <div class="feat-title">GFK-Tagebuch</div>
+      <div class="feat-text">Jede Analyse wird lokal auf deinem Gerät gespeichert. Du siehst über Wochen wie sich Muster verändern — ohne Cloud, ohne Tracking.</div>
+      <span class="feat-tag">100% lokal</span>
+    </div>
+    <div class="feat">
+      <span class="feat-icon">🌍</span>
+      <div class="feat-title">10 Ausgabe-Sprachen</div>
+      <div class="feat-text">Nachricht auf Türkisch? Antwort auf Deutsch. Resonanz trennt Eingabe- und Ausgabesprache — du verstehst immer alles in deiner Sprache.</div>
+    </div>
+  </div>
+</section>
+
+<!-- QUOTE -->
+<div class="quote-section reveal">
+  <p class="quote-text">"Die attraktivste Eigenschaft eines Menschen ist, sich selbst zu kennen — und trotzdem neugierig auf den anderen zu sein."</p>
+  <p class="quote-sub">Kernprinzip der GFK · Marshall Rosenberg</p>
+</div>
+
+<!-- FOR WHOM -->
+<section>
+  <div class="s-eyebrow">Für wen</div>
+  <h2 class="s-title">Für jeden der<br><em>tiefer fühlt.</em></h2>
+  <p class="s-lead">Resonanz ist kein Tool für "kaputte" Kommunikation. Es ist ein Verstärker — für alle, die mehr aus Gesprächen machen wollen als oberflächlichen Austausch.</p>
+  <div class="for-grid reveal">
+    <div class="for-card">
+      <span class="for-icon">💑</span>
+      <div class="for-title">Beziehungen</div>
+      <div class="for-text">Weniger reaktive Antworten. Mehr echte Verbindung. Werte-Kompatibilität früh erkennen.</div>
+    </div>
+    <div class="for-card">
+      <span class="for-icon">⚡</span>
+      <div class="for-title">ADHS & Impulsivität</div>
+      <div class="for-text">Resonanz baut die bewusste Pause ein die fehlt — zwischen Trigger und Antwort.</div>
+    </div>
+    <div class="for-card">
+      <span class="for-icon">◈</span>
+      <div class="for-title">Autismus-Spektrum</div>
+      <div class="for-text">Implizite emotionale Botschaften werden übersetzt. Kein Raten mehr was gemeint ist.</div>
+    </div>
+    <div class="for-card">
+      <span class="for-icon">♥</span>
+      <div class="for-title">Hochsensible</div>
+      <div class="for-text">Deine tiefe Wahrnehmung wird strukturiert statt überwältigend. Das ist eine Stärke.</div>
+    </div>
+    <div class="for-card">
+      <span class="for-icon">🌿</span>
+      <div class="for-title">Nach Trauma</div>
+      <div class="for-text">Nachrichten die triggern werden sicher verarbeitet — als tägliche Übung neben der Therapie.</div>
+    </div>
+    <div class="for-card">
+      <span class="for-icon">👔</span>
+      <div class="for-title">Im Arbeitsalltag</div>
+      <div class="for-text">Feedback geben und empfangen. Schwierige E-Mails verstehen. Klarheit in Konflikten.</div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST -->
+<div class="trust-section">
+  <div class="trust-inner reveal">
+    <div class="trust-item">
+      <div class="trust-n">100%</div>
+      <div class="trust-l">Privat — keine Speicherung<br>deiner Nachrichten</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-n">10</div>
+      <div class="trust-l">Sprachen für<br>Eingabe & Ausgabe</div>
+    </div>
+    <div class="trust-item">
+      <div class="trust-n">∞</div>
+      <div class="trust-l">Analysen — keine<br>künstlichen Limits</div>
+    </div>
+  </div>
+</div>
+
+<!-- FINAL CTA -->
+<div class="cta-final" id="start">
+  <div class="s-eyebrow" style="justify-content:center">Bereit?</div>
+  <h2 class="s-title">Fang heute an.<br><em>Kostenlos.</em></h2>
+  <p class="s-lead">Resonanz läuft direkt im Browser — kein Download, keine Anmeldung. Einfach öffnen und die erste Nachricht analysieren.</p>
+  <a href="./index.html" class="btn-primary" style="font-size:16px;padding:16px 40px">✦ Resonanz öffnen</a>
+  <div class="cta-badge">
+    <span>🔒</span> Deine Nachrichten verlassen nie dieses Gerät
+  </div>
+</div>
+
+<footer>
+  <div class="footer-brand">Resonanz</div>
+  <div class="footer-links">
+    <a href="./index.html">App</a>
+    <a href="/cdn-cgi/l/email-protection#a3cbc2cfcfcce3d1c6d0cccdc2cdd98dc2d3d3">Kontakt</a>
+  </div>
+</footer>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+// Scroll reveal
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.c
