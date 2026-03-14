@@ -750,6 +750,12 @@ audio{width:100%;height:28px;margin-top:6px}
         <div class="sdesc">Text, Audio oder Chat-Export — alles was du verarbeiten möchtest</div>
       </div>
 
+      <!-- Context FIRST -->
+      <div>
+        <div style="font-size:12px;color:var(--txs);margin-bottom:6px">Kontext (optional) — hilft der KI besser zu verstehen:</div>
+        <textarea class="ta" id="ctxIn" rows="2" placeholder="z. B. »Mutter · angespannte Beziehung · Thema Geld · Angst vor Ablehnung«" style="min-height:60px;resize:none"></textarea>
+      </div>
+
       <!-- Source -->
       <div>
         <div style="font-size:12px;color:var(--txs);margin-bottom:7px">Diese Nachricht kommt von:</div>
@@ -831,12 +837,6 @@ audio{width:100%;height:28px;margin-top:6px}
         <div id="share-install-hint" style="font-size:11px;color:var(--txs);margin-top:7px;display:none">
           ↑ App auf Homescreen installieren damit diese Buttons im Teilen-Menü erscheinen
         </div>
-      </div>
-
-      <!-- Context -->
-      <div>
-        <div style="font-size:12px;color:var(--txs);margin-bottom:6px">Kontext für die Analyse (optional):</div>
-        <textarea class="ta" id="ctxIn" rows="2" placeholder="z. B. »Mutter · angespannte Beziehung · Thema Geld · Angst vor Ablehnung«" style="min-height:60px;resize:none"></textarea>
       </div>
 
       <!-- Action -->
