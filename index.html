@@ -609,13 +609,21 @@ audio{width:100%;height:28px;margin-top:6px}
 
     <div class="drawer-section">
       <div class="drawer-label">API-Schlüssel</div>
+
+      <!-- Saved indicator -->
+      <div id="keys-saved-bar" style="display:none;align-items:center;gap:8px;padding:9px 12px;background:rgba(74,155,127,.1);border:.5px solid rgba(74,155,127,.3);border-radius:var(--r);margin-bottom:10px">
+        <span style="font-size:14px">🔐</span>
+        <div style="flex:1;font-size:12.5px;color:var(--p)">Keys gespeichert — automatisch geladen</div>
+        <button onclick="clearSavedKeys()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:.5px solid rgba(181,90,44,.3);background:transparent;color:var(--acc);cursor:pointer;font-family:inherit">Löschen</button>
+      </div>
+
       <div class="drawer-field" id="key-claude">
-        <div class="field-label">Anthropic (Claude)</div>
+        <div class="field-label">Anthropic (Claude) <a href="https://console.anthropic.com" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
         <input class="fi" type="password" id="ckey" placeholder="sk-ant-api03-…" autocomplete="off" oninput="updateKeyStatus('claude',this.value)">
         <div style="font-size:11px;margin-top:3px" id="key-status-claude"></div>
       </div>
       <div class="drawer-field" id="key-openai" style="display:none">
-        <div class="field-label">OpenAI (GPT-4o + Whisper)</div>
+        <div class="field-label">OpenAI (GPT-4o) <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
         <input class="fi" type="password" id="okey" placeholder="sk-proj-…" autocomplete="off" oninput="updateKeyStatus('openai',this.value)">
         <div style="font-size:11px;margin-top:3px" id="key-status-openai"></div>
       </div>
@@ -623,27 +631,63 @@ audio{width:100%;height:28px;margin-top:6px}
         <div class="field-label">Ollama URL</div>
         <input class="fi" type="text" id="olurl" value="http://localhost:11434">
       </div>
-      <div style="font-size:11px;color:var(--txs)">Nur im Arbeitsspeicher · niemals gespeichert · <a href="https://console.anthropic.com" target="_blank" style="color:var(--p);text-decoration:none">Key holen ↗</a></div>
+
+      <!-- PIN + Save -->
+      <div id="key-save-row" style="margin-top:8px">
+        <div class="field-label" style="margin-bottom:5px">4-stellige PIN zum Schutz deiner Keys</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input class="fi" type="password" id="keyPin" placeholder="z. B. 1234" maxlength="4" inputmode="numeric" style="width:100px;text-align:center;letter-spacing:6px;font-size:16px">
+          <button onclick="saveKeys()" style="flex:1;padding:8px 12px;border-radius:var(--r);border:none;background:var(--p);color:white;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">🔒 Keys speichern</button>
+        </div>
+        <div style="font-size:11px;color:var(--txs);margin-top:5px">Pin wird nicht gespeichert — nur du kennst ihn · Keys bleiben lokal auf diesem Gerät</div>
+      </div>
     </div>
 
     <div class="drawer-section">
       <div class="drawer-label">Audio-Transkription</div>
       <div class="drawer-field">
         <div class="field-label">Engine</div>
-        <select class="fi" id="weng">
-          <option value="openai">OpenAI Whisper (API)</option>
+        <select class="fi" id="weng" onchange="updateWhisperEngineUI()">
+          <option value="openai">Whisper via Browser (direkt)</option>
+          <option value="proxy">Whisper via eigenem Backend ⭐</option>
           <option value="local">Whisper.cpp (lokal)</option>
         </select>
       </div>
+      <div id="wbackend-row" style="display:none" class="drawer-field">
+        <div class="field-label">Backend URL <span style="font-size:10px;color:var(--txs)">(von Vercel nach Deploy)</span></div>
+        <input class="fi" type="text" id="wbackend" placeholder="https://dein-projekt.vercel.app/api/transcribe">
+        <div style="font-size:11px;color:var(--txs);margin-top:3px">Key liegt sicher auf dem Server — nicht im Browser</div>
+      </div>
       <div class="drawer-field">
-        <div class="field-label">OpenAI Key für Whisper</div>
+        <div class="field-label">OpenAI Key für Whisper <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
         <input class="fi" type="password" id="wkey" placeholder="sk-proj-… oder sk-…" autocomplete="off" oninput="updateKeyStatus('whisper',this.value)">
         <div style="font-size:11px;margin-top:3px" id="key-status-whisper"></div>
-        <div style="font-size:11px;color:var(--txs);margin-top:3px">Nur für Transkription · unabhängig vom KI-Modell · <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none">Key holen ↗</a></div>
+        <div style="font-size:11px;color:var(--txs);margin-top:3px">Nur für Transkription · unabhängig vom KI-Modell</div>
+      </div>
+      <div class="drawer-field" id="proxy-field">
+        <div class="field-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Proxy-URL <span style="font-size:10px;color:var(--acc);font-weight:500">Pflicht für Browser</span></span>
+          <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p);text-decoration:none;font-size:10.5px">Einrichten ↗</a>
+        </div>
+        <input class="fi" type="text" id="proxyUrl" placeholder="https://dein-worker.workers.dev" autocomplete="off" oninput="updateProxyStatus(this.value)">
+        <div style="font-size:11px;margin-top:3px" id="proxy-status"></div>
+        <div style="font-size:11px;color:var(--txs);margin-top:3px;line-height:1.5">Kostenloser Cloudflare Worker nötig — <strong>whisper-worker.js</strong> herunterladen und deployen</div>
       </div>
       <div class="drawer-field">
         <div class="field-label">Sprache (leer = automatisch)</div>
         <input class="fi" type="text" id="wlang" placeholder="de / en / auto">
+      </div>
+      <div class="drawer-field">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+          <div class="field-label">Cloudflare Worker URL (Proxy)</div>
+          <a href="https://workers.cloudflare.com" target="_blank" style="font-size:10.5px;color:var(--p);text-decoration:none">Einrichten ↗</a>
+        </div>
+        <input class="fi" type="text" id="proxyUrl" placeholder="https://whisper.DEINNAME.workers.dev" oninput="updateProxyStatus(this.value)">
+        <div id="proxy-status" style="font-size:11px;margin-top:3px"></div>
+        <div id="proxy-hint" style="font-size:11px;color:var(--txs);margin-top:4px;line-height:1.5;display:none">
+          Nötig für Brave, Firefox und manche Chrome-Versionen.<br>
+          Kostenlos · 2 Minuten · <strong>whisper-worker.js</strong> auf GitHub herunterladen
+        </div>
       </div>
     </div>
 
@@ -1074,6 +1118,9 @@ audio{width:100%;height:28px;margin-top:6px}
 
 <script>
 // ── State ──────────────────────────────────────────
+// ── Backend URL ── setze deine Vercel-URL hier ein
+const BACKEND = 'https://resonanz-backend.vercel.app'; // ← deine URL nach dem Deploy
+
 const S={
   model:'claude',mtype:'cloud',tab:'text',src:'partner',outputLang:'de',outputLangName:'Deutsch',outputLangFlag:'🇩🇪',
   togs:{self:true,resp:true,sum:true,trig:true,train:true},
@@ -1102,30 +1149,204 @@ function setModel(id,lbl,type){
 function openSettings(){document.getElementById('settingsOv').classList.add('open')}
 function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
 
-function updateKeyStatus(which,val){
-  const el=document.getElementById('key-status-'+which);
+// ── Key persistence (XOR + PIN, localStorage) ────
+const KEY_STORE = 'resonanz_keys_v1';
+
+function xorCrypt(str, pin) {
+  // Simple XOR with PIN — not bulletproof but protects against casual snooping
+  let out = '';
+  for (let i = 0; i < str.length; i++) {
+    out += String.fromCharCode(str.charCodeAt(i) ^ pin.charCodeAt(i % pin.length));
+  }
+  return btoa(unescape(encodeURIComponent(out)));
+}
+function xorDecrypt(b64, pin) {
+  try {
+    const str = decodeURIComponent(escape(atob(b64)));
+    let out = '';
+    for (let i = 0; i < str.length; i++) {
+      out += String.fromCharCode(str.charCodeAt(i) ^ pin.charCodeAt(i % pin.length));
+    }
+    return out;
+  } catch { return ''; }
+}
+
+function saveKeys() {
+  const pin = document.getElementById('keyPin').value.trim();
+  if (pin.length < 4) { showToast('PIN muss 4 Stellen haben'); return; }
+
+  const data = {
+    ckey: document.getElementById('ckey').value.trim(),
+    okey: document.getElementById('okey').value.trim(),
+    wkey: document.getElementById('wkey').value.trim(),
+    olurl: document.getElementById('olurl').value.trim(),
+    proxyUrl: document.getElementById('proxyUrl')?.value.trim()||'',
+    model: S.model,
+    mtype: S.mtype,
+    ts: Date.now()
+  };
+
+  const encrypted = xorCrypt(JSON.stringify(data), pin);
+  localStorage.setItem(KEY_STORE, encrypted);
+  document.getElementById('keyPin').value = '';
+  showKeysSavedState(true);
+  showToast('Keys gespeichert 🔒');
+  // Orange pill border gone
+  document.getElementById('mpill').style.borderColor = 'var(--bd)';
+}
+
+function loadKeys(pin) {
+  const stored = localStorage.getItem(KEY_STORE);
+  if (!stored) return false;
+  try {
+    const json = xorDecrypt(stored, pin);
+    const data = JSON.parse(json);
+    // Validate — keys should start with sk-
+    if (!data.ckey && !data.okey && !data.wkey) return false;
+    if (data.ckey) document.getElementById('ckey').value = data.ckey;
+    if (data.okey) document.getElementById('okey').value = data.okey;
+    if (data.wkey) document.getElementById('wkey').value = data.wkey;
+    if (data.olurl) document.getElementById('olurl').value = data.olurl;
+    if (data.proxyUrl) { const el=document.getElementById('proxyUrl'); if(el) el.value=data.proxyUrl; }
+    if (data.proxyUrl) { const pe=document.getElementById('proxyUrl'); if(pe)pe.value=data.proxyUrl; }
+    if (data.model) setModel(data.model,
+      {claude:'Claude Sonnet',gpt4:'GPT-4o',llama:'Llama 3.2',mistral:'Mistral 7B'}[data.model]||data.model,
+      data.mtype||'cloud');
+    // Update status indicators
+    ['claude','openai','whisper'].forEach(w => {
+      const el = document.getElementById('key-status-'+w);
+      const val = w==='claude'?data.ckey:w==='openai'?data.okey:data.wkey;
+      if (el && val) { el.textContent='✓ Geladen'; el.style.color='var(--p)'; }
+    });
+    showKeysSavedState(true);
+    return true;
+  } catch { return false; }
+}
+
+function clearSavedKeys() {
+  if (!confirm('Gespeicherte Keys löschen?')) return;
+  localStorage.removeItem(KEY_STORE);
+  document.getElementById('ckey').value = '';
+  document.getElementById('okey').value = '';
+  document.getElementById('wkey').value = '';
+  showKeysSavedState(false);
+  showToast('Keys gelöscht');
+}
+
+function showKeysSavedState(saved) {
+  document.getElementById('keys-saved-bar').style.display = saved ? 'flex' : 'none';
+  document.getElementById('key-save-row').style.display = saved ? 'none' : '';
+}
+
+function promptPinAndLoad() {
+  // Only if keys are stored
+  if (!localStorage.getItem(KEY_STORE)) return;
+  // Show PIN prompt overlay
+  const ov = document.createElement('div');
+  ov.id = 'pin-overlay';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(24,40,31,.5);z-index:800;display:flex;align-items:center;justify-content:center;padding:20px';
+  ov.innerHTML = `
+    <div style="background:var(--sur);border-radius:var(--rxl);padding:28px 24px;width:100%;max-width:320px;text-align:center">
+      <div style="font-size:2rem;margin-bottom:12px">🔐</div>
+      <div style="font-size:15px;font-weight:500;color:var(--tx);margin-bottom:6px">Keys entsperren</div>
+      <div style="font-size:13px;color:var(--txs);margin-bottom:20px">4-stellige PIN eingeben um deine gespeicherten API-Keys zu laden</div>
+      <input id="pin-input" type="password" inputmode="numeric" maxlength="4"
+        style="width:100%;padding:14px;text-align:center;font-size:1.5rem;letter-spacing:10px;border:.5px solid var(--bds);border-radius:var(--r);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;margin-bottom:12px"
+        placeholder="••••" oninput="tryLoadPin(this.value)">
+      <div id="pin-error" style="font-size:12px;color:var(--acc);min-height:16px;margin-bottom:12px"></div>
+      <button onclick="document.getElementById('pin-overlay').remove()"
+        style="width:100%;padding:10px;border-radius:var(--r);border:.5px solid var(--bds);background:transparent;color:var(--txm);font-size:13px;cursor:pointer;font-family:inherit">
+        Ohne Keys fortfahren
+      </button>
+    </div>`;
+  document.body.appendChild(ov);
+  setTimeout(() => document.getElementById('pin-input')?.focus(), 100);
+}
+
+function tryLoadPin(pin) {
+  if (pin.length < 4) return;
+  const ok = loadKeys(pin);
+  if (ok) {
+    document.getElementById('pin-overlay')?.remove();
+    showToast('Keys geladen ✓');
+  } else {
+    const err = document.getElementById('pin-error');
+    if (err) { err.textContent = 'Falsche PIN — bitte nochmal'; }
+    setTimeout(() => { if(err) err.textContent=''; }, 2000);
+    document.getElementById('pin-input').value = '';
+  }
+}
+
+function updateProxyStatus(val){
+  const el=document.getElementById('proxy-status');
   if(!el)return;
   if(!val){el.textContent='';return;}
-  const ok=(which==='claude'&&val.startsWith('sk-ant'))||
-           (which==='openai'&&(val.startsWith('sk-proj')||val.startsWith('sk-')))||
-           (which==='whisper'&&(val.startsWith('sk-proj')||val.startsWith('sk-')));
-  el.textContent=ok?'✓ Format sieht korrekt aus':'⚠ Unbekanntes Format — bitte prüfen';
+  const ok=val.startsWith('https://');
+  el.textContent=ok?'✓ URL sieht korrekt aus':'⚠ Muss mit https:// beginnen';
   el.style.color=ok?'var(--p)':'var(--acc)';
 }
 
-// Update pill to reflect key status
-function updatePillStatus(){
-  const pill=document.getElementById('mpill');
-  if(!pill)return;
-  const hasKey=(S.model==='claude'&&document.getElementById('ckey').value.trim())||
-               (S.model==='gpt4'&&document.getElementById('okey').value.trim())||
-               S.mtype==='local';
-  pill.title=hasKey?`Aktiv: ${document.getElementById('plbl').textContent} — Klicken zum Wechseln`:`Kein API-Key · Klicken zum Einrichten`;
-  pill.style.borderColor=hasKey?'var(--bd)':'rgba(181,90,44,.35)';
+function updateKeyStatus(which, val) {
+  const el = document.getElementById('key-status-'+which);
+  if (!el) return;
+  if (!val) { el.textContent=''; return; }
+  const ok = (which==='claude' && val.startsWith('sk-ant')) ||
+             ((which==='openai'||which==='whisper') && (val.startsWith('sk-proj')||val.startsWith('sk-')));
+  el.textContent = ok ? '✓ Format korrekt' : '⚠ Unbekanntes Format';
+  el.style.color = ok ? 'var(--p)' : 'var(--acc)';
+}
+
+function showCorsError(){
+  const old=document.getElementById('api-error-card');if(old)old.remove();
+  const card=document.createElement('div');
+  card.id='api-error-card';card.className='err-card';
+  card.innerHTML=`
+    <div class="err-icon">🚧</div>
+    <div style="flex:1">
+      <div class="err-title">Verbindung blockiert (CORS)</div>
+      <div class="err-msg">Dein Browser blockiert den direkten Kontakt zur Whisper API. Das passiert bei Brave, Firefox und manchen Chrome-Einstellungen.</div>
+      <div class="err-msg" style="margin-top:6px;font-weight:500;color:var(--p)">Lösung: Cloudflare Worker als kostenloser Proxy (2 Minuten):</div>
+      <div class="err-msg" style="margin-top:4px">1. <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p)">workers.cloudflare.com</a> → kostenlosen Account erstellen<br>
+      2. "Create Worker" → Code aus <strong>whisper-worker.js</strong> einfügen → Deploy<br>
+      3. Worker-URL in ⚙ Einstellungen → Audio-Transkription eintragen</div>
+      <div class="err-actions">
+        <button class="err-btn pri" onclick="openSettings();document.getElementById('api-error-card')?.remove()">⚙ Einstellungen öffnen</button>
+        <button class="err-btn sec" onclick="this.closest('.err-card').remove()">Schließen</button>
+      </div>
+    </div>`;
+  document.getElementById('screen-1').appendChild(card);
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+function updateProxyStatus(val){
+  const el=document.getElementById('proxy-status');
+  const hint=document.getElementById('proxy-hint');
+  if(!el)return;
+  if(!val){el.textContent='';if(hint)hint.style.display='block';return;}
+  const ok=val.startsWith('https://')&&val.includes('workers.dev');
+  el.textContent=ok?'✓ Format sieht korrekt aus':'⚠ Sollte mit https://...workers.dev enden';
+  el.style.color=ok?'var(--p)':'var(--acc)';
+  if(hint)hint.style.display='none';
+}
+
+function updatePillStatus() {
+  const pill = document.getElementById('mpill');
+  if (!pill) return;
+  const hasKey = (S.model==='claude' && document.getElementById('ckey').value.trim()) ||
+                 (S.model==='gpt4' && document.getElementById('okey').value.trim()) ||
+                 S.mtype==='local';
+  pill.style.borderColor = hasKey ? 'var(--bd)' : 'rgba(181,90,44,.35)';
 }
 
 // ── Toggle switches ───────────────────────────────
 function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
+
+function updateWhisperEngineUI(){
+  const eng=document.getElementById('weng').value;
+  document.getElementById('wbackend-row').style.display=eng==='proxy'?'':'none';
+  const wkeyRow=document.getElementById('wkey')?.closest('.drawer-field');
+  if(wkeyRow)wkeyRow.style.display=eng==='proxy'?'none':'';
+}
 
 // ── Output language ───────────────────────────────
 function pickLang(el,code,name){
@@ -1264,7 +1485,7 @@ async function transcribeAll(){
   const eng=document.getElementById('weng').value;
   const lang=document.getElementById('wlang').value.trim()||'de';
   // Whisper key: dedicated field (always visible), fallback to OpenAI LLM key
-  const wkey=document.getElementById('wkey').value.trim()||document.getElementById('okey').value.trim();
+  // Keys werden serverseitig verwendet — kein Key im Browser nötig
   const tb=document.getElementById('transcribeBtn');
   if(tb){tb.disabled=true;tb.classList.add('ld');}
 
@@ -1273,12 +1494,32 @@ async function transcribeAll(){
     let res=null;
     let usedDemo=false;
 
-    // Whisper API (kein Demo-Fallback wenn Key vorhanden)
-    if(eng==='openai'&&wkey){
+    // Route based on engine setting
+    const eng=document.getElementById('weng').value;
+
+    if(eng==='proxy'){
+      // Own Vercel backend — most reliable
+      const backendUrl=document.getElementById('wbackend').value.trim();
+      if(!backendUrl){
+        af.status='e';setStat(af.id,'e');
+        showAPIError('Backend-URL fehlt — bitte in ⚙ Einstellungen eintragen.');
+        if(tb){tb.disabled=false;tb.classList.remove('ld');}
+        return;
+      }
       try{
-        res=await trOpenAI(af.file,wkey,lang);
+        res=await trViaBackend(af.file,backendUrl,lang);
       }catch(err){
-        // Parse Whisper error for readable message
+        let msg=err.message||String(err);
+        af.status='e';setStat(af.id,'e');
+        showAPIError('Backend Fehler: '+msg);
+        if(tb){tb.disabled=false;tb.classList.remove('ld');}
+        return;
+      }
+    } else if(eng==='openai'&&wkey){
+      // Direct browser request (may hit CORS on some setups)
+      try{
+        res=await trOpenAI(af.file,lang);
+      }catch(err){
         let msg=err.message||String(err);
         try{const j=JSON.parse(msg);msg=j.error?.message||msg;}catch{}
         af.status='e';setStat(af.id,'e');
@@ -1286,19 +1527,32 @@ async function transcribeAll(){
         if(tb){tb.disabled=false;tb.classList.remove('ld');}
         return;
       }
-    } else if(eng==='openai'&&!wkey){
-      // Kein Key: Fehler zeigen statt Demo
-      af.status='e';setStat(af.id,'e');
-      showAPIError('Kein Whisper API-Key eingetragen — bitte in ⚙ Einstellungen unter Audio-Transkription eintragen.');
-      if(tb){tb.disabled=false;tb.classList.remove('ld');}
-      return;
-    }
-
+            if(tb){tb.disabled=false;tb.classList.remove('ld');}
+        return;
+      }
     // Ollama / lokal: kein Key nötig
     if(!res){
       res=simTR(af.name);
       usedDemo=true;
     }
+
+async function trViaBackend(file,backendUrl,lang){
+  let sendFile=file;
+  if(file.name.toLowerCase().endsWith('.opus')){
+    sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
+  }
+  const fd=new FormData();
+  fd.append('file',sendFile);
+  fd.append('model','whisper-1');
+  fd.append('response_format','verbose_json');
+  fd.append('timestamp_granularities[]','word');
+  if(lang&&lang!=='auto')fd.append('language',lang);
+  const r=await fetch(backendUrl,{method:'POST',body:fd});
+  if(!r.ok){const e=await r.text();throw new Error(e);}
+  const d=await r.json();
+  const words=(d.words||[]).map(w=>({word:w.word.trim(),start:w.start,end:w.end,prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14}));
+  return{text:d.text,words};
+}
 
     af.status='d';af.transcript=res;
     S.transcripts=S.transcripts.filter(t=>t.id!==af.id);
@@ -1309,26 +1563,26 @@ async function transcribeAll(){
 
   if(tb){tb.disabled=false;tb.classList.remove('ld');}
 }
-async function trOpenAI(file,key,lang){
-  const fd=new FormData();
-  // Whisper doesn't accept .opus — rename to .ogg (same container, works fine)
+async function trOpenAI(file,lang){
+  // .opus → .ogg (same codec, Whisper doesn't accept .opus filename)
   let sendFile=file;
   if(file.name.toLowerCase().endsWith('.opus')){
     sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
   }
-  fd.append('file',sendFile);
-  fd.append('model','whisper-1');
-  fd.append('response_format','verbose_json');
-  fd.append('timestamp_granularities[]','word');
-  if(lang&&lang!=='auto')fd.append('language',lang);
-  const r=await fetch('https://api.openai.com/v1/audio/transcriptions',{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+key},
-    body:fd
+  const fd=new FormData();
+  fd.append('audio',sendFile);
+  const r=await fetch(BACKEND+'/api/transcribe?lang='+encodeURIComponent(lang||'de'),{
+    method:'POST',body:fd
   });
-  if(!r.ok)throw new Error(await r.text());
+  if(!r.ok){
+    const e=await r.json().catch(()=>({}));
+    throw new Error(e.error||`Transkription Fehler ${r.status}`);
+  }
   const d=await r.json();
-  const words=(d.words||[]).map(w=>({word:w.word.trim(),start:w.start,end:w.end,prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14}));
+  const words=(d.words||[]).map(w=>({
+    word:w.word.trim(),start:w.start,end:w.end,
+    prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14
+  }));
   return{text:d.text,words};
 }
 function simTR(){
@@ -1457,39 +1711,32 @@ function hasValidKey(){
 }
 function hasWhisperKey(){return getKey('wkey').length>10||getKey('okey').length>10;}
 
-// ── API calls (keys nur in RAM, gehen nur an offizielle Endpunkte) ──
+// ── API calls — über Backend (keys nie im Browser) ──
 async function callAPI(prompt){
-  if(S.model==='claude'){
-    const k=getKey('ckey');
-    if(!k)throw new Error('Kein Anthropic API-Key eingetragen — bitte in ⚙ Einstellungen eintragen.');
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':k,'anthropic-version':'2023-06-01'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1400,messages:[{role:'user',content:prompt}]})
+  // Ollama lokal — direkt, kein Backend nötig
+  if(S.mtype==='local'){
+    const url=getKey('olurl')||'http://localhost:11434';
+    const m=S.model==='llama'?'llama3.2':'mistral';
+    const r=await fetch(url+'/api/generate',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:m,prompt,stream:false})
     });
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?.message||`Anthropic Fehler ${r.status}`);}
-    return(await r.json()).content[0].text;
+    if(!r.ok)throw new Error(`Ollama nicht erreichbar unter ${url} — läuft Ollama?`);
+    return(await r.json()).response;
   }
-  if(S.model==='gpt4'){
-    const k=getKey('okey');
-    if(!k)throw new Error('Kein OpenAI API-Key eingetragen — bitte in ⚙ Einstellungen eintragen.');
-    const r=await fetch('https://api.openai.com/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+k},
-      body:JSON.stringify({model:'gpt-4o',max_tokens:1400,messages:[{role:'user',content:prompt}]})
-    });
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?.message||`OpenAI Fehler ${r.status}`);}
-    return(await r.json()).choices[0].message.content;
-  }
-  // Ollama lokal
-  const url=getKey('olurl')||'http://localhost:11434';
-  const m=S.model==='llama'?'llama3.2':'mistral';
-  const r=await fetch(url+'/api/generate',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:m,prompt,stream:false})
+
+  // Cloud-Modelle → über Resonanz-Backend (kein Key im Browser)
+  const r=await fetch(BACKEND+'/api/analyse',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({prompt,model:S.model})
   });
-  if(!r.ok)throw new Error(`Ollama nicht erreichbar unter ${url} — läuft Ollama?`);
-  return(await r.json()).response;
+  if(!r.ok){
+    const e=await r.json().catch(()=>({}));
+    throw new Error(e.error||`Server-Fehler ${r.status} — Backend erreichbar?`);
+  }
+  const d=await r.json();
+  return d.result;
 }
 function parseJSON(raw){try{return JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{return null;}}
 
@@ -1578,9 +1825,7 @@ function handleMessengerShare(app){
 
 // ── Run Analysis ──────────────────────────────────
 async function runAnalysis(){
-  // Key-Check: nur mit echtem API-Key fortfahren
   const old=document.getElementById('api-error-card');if(old)old.remove();
-  if(!hasValidKey()){showKeyError();return;}
   if(S.tab==='audio'&&S.afiles.filter(f=>f.status==='p').length)await transcribeAll();
   const msg=getText();if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
   const ctx=document.getElementById('ctxIn').value.trim();
@@ -2369,6 +2614,14 @@ if('serviceWorker' in navigator){
   if(!isPWA){
     const hint=document.getElementById('share-install-hint');
     if(hint)hint.style.display='block';
+  }
+})();
+
+// ── Init: load saved keys if stored ─────────────
+(function(){
+  if(localStorage.getItem(KEY_STORE)){
+    showKeysSavedState(true);
+    promptPinAndLoad();
   }
 })();
 
