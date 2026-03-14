@@ -134,7 +134,7 @@ footer{padding:32px 24px;border-top:.5px solid var(--bd);display:flex;align-item
 
 /* ── ANIMATIONS ── */
 @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-.reveal{opacity:0;transform:translateY(24px);transition:opacity .7s ease,transform .7s ease}
+.reveal{opacity:0;transform:translateY(20px);transition:opacity .6s ease,transform .6s ease}
 .reveal.in{opacity:1;transform:translateY(0)}
 
 @media(max-width:720px){
@@ -386,7 +386,17 @@ footer{padding:32px 24px;border-top:.5px solid var(--bd);display:flex;align-item
   </div>
 </footer>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
-// Scroll reveal
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(e => { if(e.isIntersecting) e.target.c
+<script>
+function checkReveals(){
+  document.querySelectorAll('.reveal:not(.in)').forEach(function(el){
+    var r=el.getBoundingClientRect();
+    if(r.top < window.innerHeight-40) el.classList.add('in');
+  });
+}
+window.addEventListener('scroll',checkReveals,{passive:true});
+checkReveals();
+setTimeout(checkReveals,200);
+window.addEventListener('load',checkReveals);
+</script>
+</body>
+</html>
