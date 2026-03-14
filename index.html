@@ -11,146 +11,70 @@
 <meta name="description" content="GFK-gestützte Nachrichtenverarbeitung — verstehe, was Nachrichten wirklich sagen">
 <title>Resonanz</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
+<link rel="manifest" href="./manifest.json">
 <script>
-// ── PWA Manifest mit Share Target ────────────────
-const manifest={
-  name:'Resonanz',short_name:'Resonanz',
-  description:'GFK-gestützte Nachrichtenverarbeitung',
-  start_url:'./',display:'standalone',
-  background_color:'#F2EDE5',theme_color:'#2A4740',
-  orientation:'portrait-primary',
-  icons:[{
-    src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="128" fill="%232A4740"/><text y="340" x="256" text-anchor="middle" font-size="280" font-family="serif" fill="white">R</text></svg>',
-    sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'
-  }],
-  share_target:{
-    action:'./?share',
-    method:'POST',
-    enctype:'multipart/form-data',
-    params:{
-      title:'title',text:'text',url:'url',
-      files:[{
-        name:'audio',
-        accept:['audio/*','.opus','.mp3','.m4a','.wav','.ogg','.aac']
-      }]
-    }
-  }
-};
-const mBlob=new Blob([JSON.stringify(manifest)],{type:'application/json'});
-const mLink=document.createElement('link');mLink.rel='manifest';mLink.href=URL.createObjectURL(mBlob);document.head.appendChild(mLink);
-
-// ── Service Worker ────────────────────────────────
+// ── Service Worker (external sw.js) ──────────────
 if('serviceWorker' in navigator){
-  const swCode=`
-const CACHE='resonanz-v2';
-const SHARE_CACHE='resonanz-share';
-
-self.addEventListener('install',e=>{
-  self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then(c=>c.addAll([]).catch(()=>{})));
-});
-self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
-
-// ── Intercept share POST ──
-self.addEventListener('fetch',e=>{
-  const url=new URL(e.request.url);
-
-  // Handle incoming share (POST /?share)
-  if(e.request.method==='POST'&&url.searchParams.has('share')){
-    e.respondWith(handleShareTarget(e.request));
-    return;
-  }
-
-  // Normal caching for GET
-  if(e.request.method!=='GET')return;
-  e.respondWith(
-    caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('./')))
-  );
-});
-
-async function handleShareTarget(req){
-  try{
-    const fd=await req.formData();
-    const text=fd.get('text')||fd.get('url')||fd.get('title')||'';
-    const audioFiles=fd.getAll('audio');
-    const sc=await caches.open(SHARE_CACHE);
-
-    // Save text
-    if(text){
-      await sc.put('/__share_text',new Response(JSON.stringify({text,ts:Date.now()}),{headers:{'Content-Type':'application/json'}}));
-    }
-
-    // Save audio files
-    if(audioFiles.length){
-      const meta=audioFiles.map((f,i)=>({name:f.name,type:f.type,idx:i}));
-      await sc.put('/__share_audio_meta',new Response(JSON.stringify({files:meta,ts:Date.now()}),{headers:{'Content-Type':'application/json'}}));
-      for(let i=0;i<audioFiles.length;i++){
-        const ab=await audioFiles[i].arrayBuffer();
-        await sc.put('/__share_audio_'+i,new Response(ab,{headers:{'Content-Type':audioFiles[i].type||'audio/ogg','X-Filename':audioFiles[i].name}}));
-      }
-    }
-  }catch(err){console.error('Share target error:',err);}
-
-  // Redirect back to app with flag
-  return Response.redirect('./?shared=1',303);
-}
-`;
-  const swBlob=new Blob([swCode],{type:'text/javascript'});
-  navigator.serviceWorker.register(URL.createObjectURL(swBlob),{scope:'./'})
-    .then(()=>checkIncomingShare())
-    .catch(err=>console.warn('SW:',err));
+  navigator.serviceWorker.register('./sw.js', {scope:'./'})
+    .then(reg => {
+      console.log('SW registered:', reg.scope);
+      checkIncomingShare();
+    })
+    .catch(err => console.warn('SW registration failed:', err));
 }
 
 // ── Check for incoming share on page load ─────────
 async function checkIncomingShare(){
-  const params=new URLSearchParams(location.search);
+  const params = new URLSearchParams(location.search);
 
-  // GET share (text via URL param — fallback for iOS / non-SW)
-  const urlText=params.get('text')||params.get('url')||'';
-  if(urlText&&!params.has('shared')){
-    history.replaceState({},'',location.pathname);
-    window.__pendingShareText=urlText;
+  // GET share fallback (text via URL param)
+  const urlText = params.get('text') || params.get('url') || '';
+  if(urlText && !params.has('shared')){
+    history.replaceState({}, '', location.pathname);
+    window.__pendingShareText = urlText;
     return;
   }
 
-  // POST share result (SW stored it in cache)
-  if(!params.has('shared'))return;
-  history.replaceState({},'',location.pathname);
+  if(!params.has('shared')) return;
+  history.replaceState({}, '', location.pathname);
+  if(!('caches' in window)) return;
 
-  if(!('caches' in window))return;
-  const sc=await caches.open('resonanz-share');
+  const sc = await caches.open('resonanz-share');
 
   // Text
-  const textR=await sc.match('/__share_text').catch(()=>null);
+  const textR = await sc.match('/__share_text').catch(() => null);
   if(textR){
-    const d=await textR.json();
-    if(d.text)window.__pendingShareText=d.text;
+    const d = await textR.json();
+    if(d.text) window.__pendingShareText = d.text;
     await sc.delete('/__share_text');
   }
 
   // Audio files
-  const metaR=await sc.match('/__share_audio_meta').catch(()=>null);
+  const metaR = await sc.match('/__share_audio_meta').catch(() => null);
   if(metaR){
-    const meta=await metaR.json();
-    const files=[];
+    const meta = await metaR.json();
+    const files = [];
     for(const f of meta.files){
-      const fr=await sc.match('/__share_audio_'+f.idx).catch(()=>null);
+      const fr = await sc.match('/__share_audio_' + f.idx).catch(() => null);
       if(fr){
-        const ab=await fr.arrayBuffer();
-        files.push(new File([ab],f.name,{type:f.type||'audio/ogg'}));
-        await sc.delete('/__share_audio_'+f.idx);
+        const ab = await fr.arrayBuffer();
+        files.push(new File([ab], f.name, {type: f.type || 'audio/ogg'}));
+        await sc.delete('/__share_audio_' + f.idx);
       }
     }
     await sc.delete('/__share_audio_meta');
-    if(files.length)window.__pendingShareFiles=files;
+    if(files.length) window.__pendingShareFiles = files;
   }
 }
 
-// Also handle GET share immediately (no SW needed)
+// Handle GET share immediately (no SW needed)
 (function(){
-  const p=new URLSearchParams(location.search);
-  const t=p.get('text')||p.get('url')||'';
-  if(t&&!p.has('shared')){history.replaceState({},'',location.pathname);window.__pendingShareText=t;}
+  const p = new URLSearchParams(location.search);
+  const t = p.get('text') || p.get('url') || '';
+  if(t && !p.has('shared')){
+    history.replaceState({}, '', location.pathname);
+    window.__pendingShareText = t;
+  }
 })();
 </script>
 <style>
