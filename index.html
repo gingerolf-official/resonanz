@@ -632,10 +632,13 @@ audio{width:100%;height:28px;margin-top:6px}
   <button class="reset-fab" id="resetFab" onclick="fullReset()" title="Alles zurücksetzen">↺</button>
   <!-- Install banner -->
   <div class="install-bar" id="installBar">
-    <div class="install-bar-text">📲 <span>Resonanz auf Homescreen installieren — für Teilen-Integration</span></div>
+    <div class="install-bar-text">
+      <span style="font-size:20px">📲</span>
+      <span><strong>Resonanz installieren</strong> — für WhatsApp-Teilen-Integration</span>
+    </div>
     <div class="install-bar-acts">
       <button class="install-btn install-btn-yes" onclick="doInstall()">Installieren</button>
-      <button class="install-btn install-btn-no" onclick="dismissInstall()">✕</button>
+      <button class="install-btn install-btn-no" onclick="dismissInstall()">Später</button>
     </div>
   </div>
 
@@ -2209,21 +2212,46 @@ goStep=function(n){
 
 window.addEventListener('resize',()=>{if(S.curStep===5)resizeMap();});
 let deferredInstall=null;
+
+// Version bump — clears old dismissed flag so banner shows again
+const PWA_VERSION='v3-external';
+if(localStorage.getItem('pwa_version')!==PWA_VERSION){
+  localStorage.removeItem('pwa_dismissed');
+  localStorage.setItem('pwa_version',PWA_VERSION);
+}
+
 window.addEventListener('beforeinstallprompt',e=>{
-  e.preventDefault();deferredInstall=e;
-  if(!localStorage.getItem('pwa_dismissed'))
+  e.preventDefault();
+  deferredInstall=e;
+  // Show banner unless user explicitly dismissed this version
+  if(!localStorage.getItem('pwa_dismissed')){
     document.getElementById('installBar').classList.add('show');
+  }
 });
+
 function doInstall(){
-  if(!deferredInstall)return;
+  if(!deferredInstall){
+    // Fallback: guide user manually
+    showToast('Drei-Punkte-Menü → App installieren');
+    return;
+  }
   deferredInstall.prompt();
-  deferredInstall.userChoice.then(()=>{deferredInstall=null;dismissInstall();});
+  deferredInstall.userChoice.then(choice=>{
+    if(choice.outcome==='accepted'){
+      showToast('Resonanz wird installiert ✓');
+    }
+    deferredInstall=null;
+    dismissInstall();
+  });
 }
 function dismissInstall(){
   document.getElementById('installBar').classList.remove('show');
   localStorage.setItem('pwa_dismissed','1');
 }
-window.addEventListener('appinstalled',()=>{showToast('Resonanz installiert ✓');dismissInstall();});
+window.addEventListener('appinstalled',()=>{
+  showToast('Resonanz installiert ✓');
+  document.getElementById('installBar').classList.remove('show');
+});
 
 // ── Apply incoming share data to UI ──────────────
 function applyPendingShare(){
