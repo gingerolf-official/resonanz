@@ -581,18 +581,19 @@ audio{width:100%;height:28px;margin-top:6px}
     <div class="drawer-handle"></div>
     <div class="drawer-title">Einstellungen</div>
 
+    <!-- KI-Modell -->
     <div class="drawer-section">
       <div class="drawer-label">KI-Modell</div>
       <div style="display:flex;flex-direction:column;gap:6px" id="model-opts">
         <div class="mopt sel" onclick="pickModel(this,'claude','Claude Sonnet','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r);background:rgba(42,71,64,.06)">
           <div class="mot-d dc"></div>
           <div style="flex:1"><div class="mot-n">Claude Sonnet</div><div class="mot-s">Anthropic · beste Empathie</div></div>
-          <span class="mbadge mba">API</span>
+          <span class="mbadge mba">via Server</span>
         </div>
         <div class="mopt" onclick="pickModel(this,'gpt4','GPT-4o','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
           <div class="mot-d dc"></div>
           <div style="flex:1"><div class="mot-n">GPT-4o</div><div class="mot-s">OpenAI · sehr präzise</div></div>
-          <span class="mbadge mba">API</span>
+          <span class="mbadge mba">via Server</span>
         </div>
         <div class="mopt" onclick="pickModel(this,'llama','Llama 3.2','local')" style="border:.5px solid var(--bd);border-radius:var(--r)">
           <div class="mot-d dl"></div>
@@ -605,92 +606,41 @@ audio{width:100%;height:28px;margin-top:6px}
           <span class="mbadge mbl">Lokal</span>
         </div>
       </div>
+      <div style="font-size:11px;color:var(--txs);margin-top:8px;padding:8px 10px;background:rgba(42,71,64,.04);border-radius:var(--r)">
+        🔒 API-Keys liegen sicher auf dem Server — du musst nichts eingeben
+      </div>
     </div>
 
-    <div class="drawer-section">
-      <div class="drawer-label">API-Schlüssel</div>
-
-      <!-- Saved indicator -->
-      <div id="keys-saved-bar" style="display:none;align-items:center;gap:8px;padding:9px 12px;background:rgba(74,155,127,.1);border:.5px solid rgba(74,155,127,.3);border-radius:var(--r);margin-bottom:10px">
-        <span style="font-size:14px">🔐</span>
-        <div style="flex:1;font-size:12.5px;color:var(--p)">Keys gespeichert — automatisch geladen</div>
-        <button onclick="clearSavedKeys()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:.5px solid rgba(181,90,44,.3);background:transparent;color:var(--acc);cursor:pointer;font-family:inherit">Löschen</button>
-      </div>
-
-      <div class="drawer-field" id="key-claude">
-        <div class="field-label">Anthropic (Claude) <a href="https://console.anthropic.com" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
-        <input class="fi" type="password" id="ckey" placeholder="sk-ant-api03-…" autocomplete="off" oninput="updateKeyStatus('claude',this.value)">
-        <div style="font-size:11px;margin-top:3px" id="key-status-claude"></div>
-      </div>
-      <div class="drawer-field" id="key-openai" style="display:none">
-        <div class="field-label">OpenAI (GPT-4o) <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
-        <input class="fi" type="password" id="okey" placeholder="sk-proj-…" autocomplete="off" oninput="updateKeyStatus('openai',this.value)">
-        <div style="font-size:11px;margin-top:3px" id="key-status-openai"></div>
-      </div>
-      <div class="drawer-field" id="key-ollama" style="display:none">
+    <!-- Ollama URL (nur lokal) -->
+    <div class="drawer-section" id="key-ollama" style="display:none">
+      <div class="drawer-label">Ollama Einstellungen</div>
+      <div class="drawer-field">
         <div class="field-label">Ollama URL</div>
         <input class="fi" type="text" id="olurl" value="http://localhost:11434">
       </div>
-
-      <!-- PIN + Save -->
-      <div id="key-save-row" style="margin-top:8px">
-        <div class="field-label" style="margin-bottom:5px">4-stellige PIN zum Schutz deiner Keys</div>
-        <div style="display:flex;gap:8px;align-items:center">
-          <input class="fi" type="password" id="keyPin" placeholder="z. B. 1234" maxlength="4" inputmode="numeric" style="width:100px;text-align:center;letter-spacing:6px;font-size:16px">
-          <button onclick="saveKeys()" style="flex:1;padding:8px 12px;border-radius:var(--r);border:none;background:var(--p);color:white;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">🔒 Keys speichern</button>
-        </div>
-        <div style="font-size:11px;color:var(--txs);margin-top:5px">Pin wird nicht gespeichert — nur du kennst ihn · Keys bleiben lokal auf diesem Gerät</div>
-      </div>
     </div>
 
+    <!-- Audio -->
     <div class="drawer-section">
       <div class="drawer-label">Audio-Transkription</div>
       <div class="drawer-field">
-        <div class="field-label">Engine</div>
-        <select class="fi" id="weng" onchange="updateWhisperEngineUI()">
-          <option value="openai">Whisper via Browser (direkt)</option>
-          <option value="proxy">Whisper via eigenem Backend ⭐</option>
-          <option value="local">Whisper.cpp (lokal)</option>
+        <div class="field-label">Sprache der Aufnahme</div>
+        <select class="fi" id="wlang">
+          <option value="de">Deutsch</option>
+          <option value="en">Englisch</option>
+          <option value="tr">Türkisch</option>
+          <option value="ar">Arabisch</option>
+          <option value="ru">Russisch</option>
+          <option value="es">Spanisch</option>
+          <option value="fr">Französisch</option>
+          <option value="it">Italienisch</option>
+          <option value="auto">Automatisch erkennen</option>
         </select>
-      </div>
-      <div id="wbackend-row" style="display:none" class="drawer-field">
-        <div class="field-label">Backend URL <span style="font-size:10px;color:var(--txs)">(von Vercel nach Deploy)</span></div>
-        <input class="fi" type="text" id="wbackend" placeholder="https://dein-projekt.vercel.app/api/transcribe">
-        <div style="font-size:11px;color:var(--txs);margin-top:3px">Key liegt sicher auf dem Server — nicht im Browser</div>
-      </div>
-      <div class="drawer-field">
-        <div class="field-label">OpenAI Key für Whisper <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
-        <input class="fi" type="password" id="wkey" placeholder="sk-proj-… oder sk-…" autocomplete="off" oninput="updateKeyStatus('whisper',this.value)">
-        <div style="font-size:11px;margin-top:3px" id="key-status-whisper"></div>
-        <div style="font-size:11px;color:var(--txs);margin-top:3px">Nur für Transkription · unabhängig vom KI-Modell</div>
-      </div>
-      <div class="drawer-field" id="proxy-field">
-        <div class="field-label" style="display:flex;align-items:center;justify-content:space-between">
-          <span>Proxy-URL <span style="font-size:10px;color:var(--acc);font-weight:500">Pflicht für Browser</span></span>
-          <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p);text-decoration:none;font-size:10.5px">Einrichten ↗</a>
-        </div>
-        <input class="fi" type="text" id="proxyUrl" placeholder="https://dein-worker.workers.dev" autocomplete="off" oninput="updateProxyStatus(this.value)">
-        <div style="font-size:11px;margin-top:3px" id="proxy-status"></div>
-        <div style="font-size:11px;color:var(--txs);margin-top:3px;line-height:1.5">Kostenloser Cloudflare Worker nötig — <strong>whisper-worker.js</strong> herunterladen und deployen</div>
-      </div>
-      <div class="drawer-field">
-        <div class="field-label">Sprache (leer = automatisch)</div>
-        <input class="fi" type="text" id="wlang" placeholder="de / en / auto">
-      </div>
-      <div class="drawer-field">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-          <div class="field-label">Cloudflare Worker URL (Proxy)</div>
-          <a href="https://workers.cloudflare.com" target="_blank" style="font-size:10.5px;color:var(--p);text-decoration:none">Einrichten ↗</a>
-        </div>
-        <input class="fi" type="text" id="proxyUrl" placeholder="https://whisper.DEINNAME.workers.dev" oninput="updateProxyStatus(this.value)">
-        <div id="proxy-status" style="font-size:11px;margin-top:3px"></div>
-        <div id="proxy-hint" style="font-size:11px;color:var(--txs);margin-top:4px;line-height:1.5;display:none">
-          Nötig für Brave, Firefox und manche Chrome-Versionen.<br>
-          Kostenlos · 2 Minuten · <strong>whisper-worker.js</strong> auf GitHub herunterladen
-        </div>
+        <div style="font-size:11px;color:var(--txs);margin-top:4px">Welche Sprache wird in den Audios gesprochen?</div>
       </div>
     </div>
 
+    <!-- Ausgabe-Module -->
     <div class="drawer-section">
       <div class="drawer-label">Ausgabe-Module</div>
       <div id="toggle-list">
@@ -717,9 +667,10 @@ audio{width:100%;height:28px;margin-top:6px}
       </div>
     </div>
 
+    <!-- Ausgabe-Sprache -->
     <div class="drawer-section">
       <div class="drawer-label">Ausgabe-Sprache</div>
-      <div style="font-size:12px;color:var(--txs);margin-bottom:8px">Egal in welcher Sprache die Eingabe ist — die Analyse erscheint in dieser Sprache</div>
+      <div style="font-size:12px;color:var(--txs);margin-bottom:8px">Sprache der GFK-Analyse — unabhängig von der Eingabe</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="lang-opts">
         <div class="lang-opt sel" onclick="pickLang(this,'de','Deutsch')"><span class="lang-flag">🇩🇪</span> Deutsch</div>
         <div class="lang-opt" onclick="pickLang(this,'en','English')"><span class="lang-flag">🇬🇧</span> English</div>
@@ -730,9 +681,7 @@ audio{width:100%;height:28px;margin-top:6px}
         <div class="lang-opt" onclick="pickLang(this,'ar','العربية')"><span class="lang-flag">🇸🇦</span> العربية</div>
         <div class="lang-opt" onclick="pickLang(this,'ru','Русский')"><span class="lang-flag">🇷🇺</span> Русский</div>
         <div class="lang-opt" onclick="pickLang(this,'zh','中文')"><span class="lang-flag">🇨🇳</span> 中文</div>
-        <div class="lang-opt" onclick="pickLang(this,'ja','日本語')"><span class="lang-flag">🇯🇵</span> 日本語</div>
         <div class="lang-opt" onclick="pickLang(this,'pt','Português')"><span class="lang-flag">🇧🇷</span> Português</div>
-        <div class="lang-opt" onclick="pickLang(this,'nl','Nederlands')"><span class="lang-flag">🇳🇱</span> Nederlands</div>
       </div>
     </div>
 
@@ -1140,161 +1089,16 @@ function setModel(id,lbl,type){
   S.model=id;S.mtype=type;
   document.getElementById('plbl').textContent=lbl;
   const d=document.getElementById('pdot');d.className='mdot'+(type==='local'?' loc':'');
-  document.getElementById('key-claude').style.display=id==='claude'?'':'none';
-  document.getElementById('key-openai').style.display=id==='gpt4'?'':'none';
-  document.getElementById('key-ollama').style.display=type==='local'?'':'none';
+  const ollamaSection=document.getElementById('key-ollama');
+  if(ollamaSection)ollamaSection.style.display=type==='local'?'':'none';
 }
 
 // ── Settings drawer ───────────────────────────────
 function openSettings(){document.getElementById('settingsOv').classList.add('open')}
 function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
 
-// ── Key persistence (XOR + PIN, localStorage) ────
-const KEY_STORE = 'resonanz_keys_v1';
 
-function xorCrypt(str, pin) {
-  // Simple XOR with PIN — not bulletproof but protects against casual snooping
-  let out = '';
-  for (let i = 0; i < str.length; i++) {
-    out += String.fromCharCode(str.charCodeAt(i) ^ pin.charCodeAt(i % pin.length));
-  }
-  return btoa(unescape(encodeURIComponent(out)));
-}
-function xorDecrypt(b64, pin) {
-  try {
-    const str = decodeURIComponent(escape(atob(b64)));
-    let out = '';
-    for (let i = 0; i < str.length; i++) {
-      out += String.fromCharCode(str.charCodeAt(i) ^ pin.charCodeAt(i % pin.length));
-    }
-    return out;
-  } catch { return ''; }
-}
-
-function saveKeys() {
-  const pin = document.getElementById('keyPin').value.trim();
-  if (pin.length < 4) { showToast('PIN muss 4 Stellen haben'); return; }
-
-  const data = {
-    ckey: document.getElementById('ckey').value.trim(),
-    okey: document.getElementById('okey').value.trim(),
-    wkey: document.getElementById('wkey').value.trim(),
-    olurl: document.getElementById('olurl').value.trim(),
-    proxyUrl: document.getElementById('proxyUrl')?.value.trim()||'',
-    model: S.model,
-    mtype: S.mtype,
-    ts: Date.now()
-  };
-
-  const encrypted = xorCrypt(JSON.stringify(data), pin);
-  localStorage.setItem(KEY_STORE, encrypted);
-  document.getElementById('keyPin').value = '';
-  showKeysSavedState(true);
-  showToast('Keys gespeichert 🔒');
-  // Orange pill border gone
-  document.getElementById('mpill').style.borderColor = 'var(--bd)';
-}
-
-function loadKeys(pin) {
-  const stored = localStorage.getItem(KEY_STORE);
-  if (!stored) return false;
-  try {
-    const json = xorDecrypt(stored, pin);
-    const data = JSON.parse(json);
-    // Validate — keys should start with sk-
-    if (!data.ckey && !data.okey && !data.wkey) return false;
-    if (data.ckey) document.getElementById('ckey').value = data.ckey;
-    if (data.okey) document.getElementById('okey').value = data.okey;
-    if (data.wkey) document.getElementById('wkey').value = data.wkey;
-    if (data.olurl) document.getElementById('olurl').value = data.olurl;
-    if (data.proxyUrl) { const el=document.getElementById('proxyUrl'); if(el) el.value=data.proxyUrl; }
-    if (data.proxyUrl) { const pe=document.getElementById('proxyUrl'); if(pe)pe.value=data.proxyUrl; }
-    if (data.model) setModel(data.model,
-      {claude:'Claude Sonnet',gpt4:'GPT-4o',llama:'Llama 3.2',mistral:'Mistral 7B'}[data.model]||data.model,
-      data.mtype||'cloud');
-    // Update status indicators
-    ['claude','openai','whisper'].forEach(w => {
-      const el = document.getElementById('key-status-'+w);
-      const val = w==='claude'?data.ckey:w==='openai'?data.okey:data.wkey;
-      if (el && val) { el.textContent='✓ Geladen'; el.style.color='var(--p)'; }
-    });
-    showKeysSavedState(true);
-    return true;
-  } catch { return false; }
-}
-
-function clearSavedKeys() {
-  if (!confirm('Gespeicherte Keys löschen?')) return;
-  localStorage.removeItem(KEY_STORE);
-  document.getElementById('ckey').value = '';
-  document.getElementById('okey').value = '';
-  document.getElementById('wkey').value = '';
-  showKeysSavedState(false);
-  showToast('Keys gelöscht');
-}
-
-function showKeysSavedState(saved) {
-  document.getElementById('keys-saved-bar').style.display = saved ? 'flex' : 'none';
-  document.getElementById('key-save-row').style.display = saved ? 'none' : '';
-}
-
-function promptPinAndLoad() {
-  // Only if keys are stored
-  if (!localStorage.getItem(KEY_STORE)) return;
-  // Show PIN prompt overlay
-  const ov = document.createElement('div');
-  ov.id = 'pin-overlay';
-  ov.style.cssText = 'position:fixed;inset:0;background:rgba(24,40,31,.5);z-index:800;display:flex;align-items:center;justify-content:center;padding:20px';
-  ov.innerHTML = `
-    <div style="background:var(--sur);border-radius:var(--rxl);padding:28px 24px;width:100%;max-width:320px;text-align:center">
-      <div style="font-size:2rem;margin-bottom:12px">🔐</div>
-      <div style="font-size:15px;font-weight:500;color:var(--tx);margin-bottom:6px">Keys entsperren</div>
-      <div style="font-size:13px;color:var(--txs);margin-bottom:20px">4-stellige PIN eingeben um deine gespeicherten API-Keys zu laden</div>
-      <input id="pin-input" type="password" inputmode="numeric" maxlength="4"
-        style="width:100%;padding:14px;text-align:center;font-size:1.5rem;letter-spacing:10px;border:.5px solid var(--bds);border-radius:var(--r);background:var(--bg);color:var(--tx);font-family:inherit;outline:none;margin-bottom:12px"
-        placeholder="••••" oninput="tryLoadPin(this.value)">
-      <div id="pin-error" style="font-size:12px;color:var(--acc);min-height:16px;margin-bottom:12px"></div>
-      <button onclick="document.getElementById('pin-overlay').remove()"
-        style="width:100%;padding:10px;border-radius:var(--r);border:.5px solid var(--bds);background:transparent;color:var(--txm);font-size:13px;cursor:pointer;font-family:inherit">
-        Ohne Keys fortfahren
-      </button>
-    </div>`;
-  document.body.appendChild(ov);
-  setTimeout(() => document.getElementById('pin-input')?.focus(), 100);
-}
-
-function tryLoadPin(pin) {
-  if (pin.length < 4) return;
-  const ok = loadKeys(pin);
-  if (ok) {
-    document.getElementById('pin-overlay')?.remove();
-    showToast('Keys geladen ✓');
-  } else {
-    const err = document.getElementById('pin-error');
-    if (err) { err.textContent = 'Falsche PIN — bitte nochmal'; }
-    setTimeout(() => { if(err) err.textContent=''; }, 2000);
-    document.getElementById('pin-input').value = '';
-  }
-}
-
-function updateProxyStatus(val){
-  const el=document.getElementById('proxy-status');
-  if(!el)return;
-  if(!val){el.textContent='';return;}
-  const ok=val.startsWith('https://');
-  el.textContent=ok?'✓ URL sieht korrekt aus':'⚠ Muss mit https:// beginnen';
-  el.style.color=ok?'var(--p)':'var(--acc)';
-}
-
-function updateKeyStatus(which, val) {
-  const el = document.getElementById('key-status-'+which);
-  if (!el) return;
-  if (!val) { el.textContent=''; return; }
-  const ok = (which==='claude' && val.startsWith('sk-ant')) ||
-             ((which==='openai'||which==='whisper') && (val.startsWith('sk-proj')||val.startsWith('sk-')));
-  el.textContent = ok ? '✓ Format korrekt' : '⚠ Unbekanntes Format';
-  el.style.color = ok ? 'var(--p)' : 'var(--acc)';
-}
+function updateKeyStatus(){} // keys are on server
 
 function showCorsError(){
   const old=document.getElementById('api-error-card');if(old)old.remove();
@@ -1329,14 +1133,7 @@ function updateProxyStatus(val){
   if(hint)hint.style.display='none';
 }
 
-function updatePillStatus() {
-  const pill = document.getElementById('mpill');
-  if (!pill) return;
-  const hasKey = (S.model==='claude' && document.getElementById('ckey').value.trim()) ||
-                 (S.model==='gpt4' && document.getElementById('okey').value.trim()) ||
-                 S.mtype==='local';
-  pill.style.borderColor = hasKey ? 'var(--bd)' : 'rgba(181,90,44,.35)';
-}
+function updatePillStatus(){}
 
 // ── Toggle switches ───────────────────────────────
 function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
@@ -1704,10 +1501,7 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
 // ── Key helpers ──────────────────────────────────
 function getKey(id){const el=document.getElementById(id);return el?el.value.trim():'';}
 function hasValidKey(){
-  if(S.mtype==='local')return true;
-  if(S.model==='claude')return getKey('ckey').length>10;
-  if(S.model==='gpt4')return getKey('okey').length>10;
-  return false;
+  return true; // Keys are on the server
 }
 function hasWhisperKey(){return getKey('wkey').length>10||getKey('okey').length>10;}
 
@@ -2614,14 +2408,6 @@ if('serviceWorker' in navigator){
   if(!isPWA){
     const hint=document.getElementById('share-install-hint');
     if(hint)hint.style.display='block';
-  }
-})();
-
-// ── Init: load saved keys if stored ─────────────
-(function(){
-  if(localStorage.getItem(KEY_STORE)){
-    showKeysSavedState(true);
-    promptPinAndLoad();
   }
 })();
 
