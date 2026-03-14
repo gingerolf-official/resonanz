@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resonanz — PWA Check</title>
+<style>
+body{font-family:sans-serif;background:#F2EDE5;color:#18281F;padding:20px;max-width:500px;margin:0 auto}
+h1{font-size:1.3rem;margin-bottom:20px;color:#2A4740}
+.item{display:flex;align-items:flex-start;gap:10px;padding:12px;background:white;border-radius:12px;margin-bottom:8px;border:.5px solid rgba(42,71,64,.1)}
+.icon{font-size:18px;flex-shrink:0;margin-top:1px}
+.label{font-size:13px;font-weight:500;color:#18281F}
+.sub{font-size:12px;color:#8A9890;margin-top:2px}
+.status{margin-left:auto;font-size:12px;font-weight:500;flex-shrink:0}
+.ok{color:#4A9B7F}.err{color:#B55A2C}.wait{color:#9A7A46}
+button{width:100%;padding:12px;background:#2A4740;color:white;border:none;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;margin-top:12px}
+</style>
+</head>
+<body>
+<h1>🔍 Resonanz — PWA Diagnose</h1>
+
+<div class="item"><div class="icon">🔒</div><div><div class="label">HTTPS</div><div class="sub" id="s-https">prüfe…</div></div><div class="status" id="i-https">⏳</div></div>
+<div class="item"><div class="icon">📋</div><div><div class="label">manifest.json</div><div class="sub" id="s-manifest">prüfe…</div></div><div class="status" id="i-manifest">⏳</div></div>
+<div class="item"><div class="icon">⚙️</div><div><div class="label">Service Worker (sw.js)</div><div class="sub" id="s-sw">prüfe…</div></div><div class="status" id="i-sw">⏳</div></div>
+<div class="item"><div class="icon">🖼️</div><div><div class="label">Icon 192px</div><div class="sub" id="s-icon192">prüfe…</div></div><div class="status" id="i-icon192">⏳</div></div>
+<div class="item"><div class="icon">🖼️</div><div><div class="label">Icon 512px</div><div class="sub" id="s-icon512">prüfe…</div></div><div class="status" id="i-icon512">⏳</div></div>
+<div class="item"><div class="icon">📱</div><div><div class="label">Installierbar</div><div class="sub" id="s-install">prüfe…</div></div><div class="status" id="i-install">⏳</div></div>
+
+<div id="result" style="margin-top:16px;padding:14px;border-radius:12px;font-size:13px;line-height:1.6;display:none"></div>
+<button onclick="runCheck()">🔄 Erneut prüfen</button>
+<button onclick="location.href='./'" style="background:transparent;color:#2A4740;border:.5px solid rgba(42,71,64,.3);margin-top:8px">← Zurück zu Resonanz</button>
+
+<script>
+let installable = false;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installable = true;
+  set('install','✅ ok','Banner kann angezeigt werden','ok');
+  showResult();
+});
+
+function set(id, status, sub, cls){
+  document.getElementById('i-'+id).textContent = status;
+  document.getElementById('i-'+id).className = 'status ' + (cls||'');
+  document.getElementById('s-'+id).textContent = sub;
+}
+
+async function runCheck(){
+  // HTTPS
+  const isHttps = location.protocol === 'https:';
+  set('https', isHttps?'✅ ok':'❌ fehlt', location.href, isHttps?'ok':'err');
+
+  // manifest.json
+  try{
+    const r = await fetch('./manifest.json');
+    if(r.ok){
+      const m = await r.json();
+      const hasIcons = m.icons && m.icons.length >= 2;
+      const hasShare = !!m.share_target;
+      set('manifest','✅ ok',`name: ${m.name}, Icons: ${m.icons?.length||0}, Share Target: ${hasShare?'ja':'nein'}`, 'ok');
+    } else {
+      set('manifest','❌ '+r.status,'Datei nicht gefunden — hochgeladen?','err');
+    }
+  }catch(e){ set('manifest','❌ Fehler',e.message,'err'); }
+
+  // sw.js
+  try{
+    const r = await fetch('./sw.js');
+    if(r.ok){
+      set('sw','✅ ok','sw.js erreichbar','ok');
+      if('serviceWorker' in navigator){
+        const reg = await navigator.serviceWorker.register('./sw.js');
+        set('sw','✅ ok','Service Worker aktiv: '+reg.scope,'ok');
+      }
+    } else {
+      set('sw','❌ '+r.status,'sw.js nicht gefunden — hochgeladen?','err');
+    }
+  }catch(e){ set('sw','❌ Fehler',e.message,'err'); }
+
+  // Icons
+  for(const size of [192, 512]){
+    try{
+      const r = await fetch(`./icon-${size}.png`);
+      const ct = r.headers.get('content-type')||'';
+      if(r.ok && ct.includes('image')){
+        set('icon'+size,'✅ ok',`${size}px PNG erreichbar (${ct})`,'ok');
+      } else {
+        set('icon'+size,'❌ fehlt',`icon-${size}.png nicht gefunden oder falscher Typ: ${ct}`,'err');
+      }
+    }catch(e){ set('icon'+size,'❌ Fehler',e.message,'err'); }
+  }
+
+  // Install
+  if(!installable){
+    const isInstalled = window.matchMedia('(display-mode: standalone)').matches;
+    if(isInstalled){
+      set('install','✅ installiert','App läuft als PWA','ok');
+    } else {
+      set('install','⏳ warte','Chrome zeigt Banner nach kurzer Nutzungszeit','wait');
+    }
+  }
+  showResult();
+}
+
+function showResult(){
+  const errors = document.querySelectorAll('.status.err').length;
+  const r = document.getElementById('result');
+  r.style.display = 'block';
+  if(errors === 0){
+    r.style.background = 'rgba(74,155,127,.1)';
+    r.style.border = '.5px solid rgba(74,155,127,.3)';
+    r.innerHTML = '✅ <strong>Alles in Ordnung!</strong> Chrome sollte den Installations-Banner anzeigen. Falls nicht: Seite 2× neu laden, dann erscheint er.';
+  } else {
+    r.style.background = 'rgba(181,90,44,.08)';
+    r.style.border = '.5px solid rgba(181,90,44,.3)';
+    r.innerHTML = `❌ <strong>${errors} Problem${errors>1?'e':''} gefunden.</strong> Rote Punkte oben zeigen was fehlt. Meist sind es fehlende Dateien auf GitHub — alle 5 hochladen?`;
+  }
+}
+
+runCheck();
+</script>
+</body>
+</html>
