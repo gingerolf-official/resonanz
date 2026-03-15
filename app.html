@@ -121,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 .ibtn:hover{background:var(--sur2);color:var(--p)}
 
 /* ─── STEP NAV ─── */
-.steps{display:flex;align-items:center;gap:0;background:var(--sur);border-bottom:.5px solid var(--bd);padding:0 20px;overflow-x:auto;scrollbar-width:none;position:sticky;top:var(--hdr-h,56px);z-index:50}
+.steps{display:flex;align-items:center;gap:0;background:var(--sur);border-bottom:.5px solid var(--bd);padding:0 20px;overflow-x:auto;scrollbar-width:none}
 .steps::-webkit-scrollbar{display:none}
 .step{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;color:var(--txs);font-size:13px;transition:all .15s;flex-shrink:0;background:none;border-left:none;border-right:none;border-top:none;font-family:'DM Sans',sans-serif}
 .step.act{color:var(--p);border-bottom-color:var(--p)}
@@ -384,8 +384,7 @@ audio{width:100%;height:28px;margin-top:6px}
 .istep-n{width:20px;height:20px;border-radius:50%;background:var(--p);color:white;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 
 /* ─── INSTALL BANNER ─── */
-.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:linear-gradient(135deg,#2A4740,#38594F);color:white;font-size:13px;animation:slideDown .35s ease}
-@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;background:var(--p);color:white;font-size:13px}
 .install-bar.show{display:flex}
 .install-bar-text{display:flex;align-items:center;gap:8px}
 .install-bar-acts{display:flex;gap:6px;flex-shrink:0}
@@ -473,103 +472,62 @@ audio{width:100%;height:28px;margin-top:6px}
 .map-insight{background:rgba(42,71,64,.04);border:.5px solid rgba(42,71,64,.12);border-radius:var(--r);padding:10px 12px;font-size:12.5px;color:var(--txm);line-height:1.6}
 .map-insight strong{font-weight:500;color:var(--p)}
 .mlbl{font-size:11px;color:var(--txs);margin-bottom:2px;display:block}
-
-/* ── Access Gate ── */
-#access-gate{position:fixed;inset:0;background:#F2EDE4;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px}
-.gate-box{background:#FDFAF6;border:.5px solid rgba(42,71,64,.12);border-radius:24px;padding:40px 32px;width:100%;max-width:360px;text-align:center}
-.gate-logo{font-family:'DM Sans',sans-serif;font-size:1.4rem;color:#2A4740;margin-bottom:8px;letter-spacing:-.02em}
-.gate-sub{font-size:13px;color:#8A9C94;margin-bottom:32px;line-height:1.6}
-.gate-input{width:100%;padding:13px 16px;border:.5px solid rgba(42,71,64,.2);border-radius:12px;font-size:15px;text-align:center;letter-spacing:.15em;background:#F2EDE4;color:#0E1A14;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:10px;transition:border-color .2s}
-.gate-input:focus{border-color:#2A4740}
-.gate-btn{width:100%;padding:13px;background:#2A4740;color:white;border:none;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s;margin-bottom:8px}
-.gate-btn:hover{background:#38594F}
-.gate-err{font-size:12px;color:#B55A2C;min-height:18px;margin-bottom:8px}
-.gate-back{font-size:12px;color:#8A9C94;text-decoration:none;display:block;margin-top:12px}
-.gate-back:hover{color:#2A4740}
-
-
-.model-quick{position:absolute;top:calc(100% + 8px);right:0;background:var(--sur);border:.5px solid var(--bds);border-radius:12px;padding:6px;min-width:160px;z-index:300;display:none;box-shadow:0 4px 20px rgba(0,0,0,.1)}
-.model-quick.open{display:block}
-.mq-opt{padding:9px 12px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--tx);transition:background .1s}
-.mq-opt:hover{background:var(--sur2)}
-.mq-opt.sel{background:rgba(42,71,64,.08);color:var(--p);font-weight:500}
-.mq-dot{width:8px;height:8px;border-radius:50%;background:var(--p);flex-shrink:0}
-.mq-dot.loc{background:var(--gold)}
 </style>
 </head>
 <body>
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
-<!-- Access Gate -->
-<div id="access-gate" style="display:none">
+<style>
+#access-gate{position:fixed;inset:0;background:#F2EDE4;z-index:9999;display:none;align-items:center;justify-content:center;padding:24px}
+.gate-box{background:#FDFAF6;border:.5px solid rgba(42,71,64,.12);border-radius:24px;padding:40px 32px;width:100%;max-width:320px;text-align:center}
+.gate-logo{font-size:1.4rem;color:#2A4740;margin-bottom:8px}
+.gate-sub{font-size:13px;color:#8A9C94;margin-bottom:28px;line-height:1.6}
+.gate-input{width:100%;padding:13px 16px;border:.5px solid rgba(42,71,64,.2);border-radius:12px;font-size:15px;text-align:center;letter-spacing:.15em;background:#F2EDE4;color:#0E1A14;font-family:inherit;outline:none;margin-bottom:10px;transition:border-color .2s}
+.gate-input:focus{border-color:#2A4740}
+.gate-btn{width:100%;padding:13px;background:#2A4740;color:white;border:none;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;margin-bottom:8px}
+.gate-btn:hover{background:#38594F}
+.gate-err{font-size:12px;color:#B55A2C;min-height:18px;margin-bottom:8px}
+.gate-back{font-size:12px;color:#8A9C94;text-decoration:none;display:block;margin-top:12px}
+</style>
+<div id="access-gate">
   <div class="gate-box">
     <div class="gate-logo">✦ Resonanz</div>
     <p class="gate-sub">Gib deinen Zugangscode ein<br>um die App zu öffnen.</p>
     <input class="gate-input" id="gate-input" type="password" placeholder="XXXX-XXXX"
-      maxlength="20" autocomplete="off" spellcheck="false"
-      onkeydown="if(event.key==='Enter')checkCode()">
+      maxlength="20" autocomplete="off" onkeydown="if(event.key==='Enter')checkCode()">
     <div class="gate-err" id="gate-err"></div>
     <button class="gate-btn" id="gate-btn" onclick="checkCode()">Zugang öffnen →</button>
-    <a href="https://resonanz.chat" class="gate-back" href="https://resonanz.chat">← Zur Startseite</a>
+    <a href="https://resonanz.chat" class="gate-back">← Zur Startseite</a>
   </div>
 </div>
-
 <script>
-// ── Secure gate: code verified on server, token stored locally ──
-const GATE_KEY = 'resonanz_token_v1';
-const GATE_BACKEND = 'https://resonanz-backend.vercel.app';
-
+const GATE_KEY='resonanz_token_v1';
+const GATE_BACKEND='https://resonanz-backend.vercel.app';
 async function checkCode(){
-  const input = document.getElementById('gate-input');
-  const btn = document.getElementById('gate-btn');
-  const err = document.getElementById('gate-err');
-  const val = input.value.trim();
-  if(!val){ err.textContent='Bitte Code eingeben'; return; }
-
-  btn.textContent = 'Prüfe…';
-  btn.disabled = true;
-  err.textContent = '';
-
-  try {
-    const r = await fetch(GATE_BACKEND + '/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: val })
-    });
-    const d = await r.json();
-    if (r.ok && d.token) {
-      // localStorage = persists across app restarts and share-button opens
-      localStorage.setItem(GATE_KEY, d.token);
-      dismissGate();
+  const input=document.getElementById('gate-input');
+  const btn=document.getElementById('gate-btn');
+  const err=document.getElementById('gate-err');
+  const val=input.value.trim();
+  if(!val){err.textContent='Bitte Code eingeben';return;}
+  btn.textContent='Prüfe…';btn.disabled=true;err.textContent='';
+  try{
+    const r=await fetch(GATE_BACKEND+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:val})});
+    const d=await r.json();
+    if(r.ok&&d.token){
+      localStorage.setItem(GATE_KEY,d.token);
+      document.getElementById('access-gate').style.display='none';
     } else {
-      err.textContent = d.error || 'Ungültiger Code';
-      input.value = '';
-      input.focus();
+      err.textContent=d.error||'Ungültiger Code';
+      input.value='';input.focus();
     }
-  } catch(e) {
-    err.textContent = 'Verbindungsfehler: ' + (e.message || 'unbekannt');
-    console.error('Gate error:', e);
-  }
-  btn.textContent = 'Zugang öffnen →';
-  btn.disabled = false;
+  }catch(e){err.textContent='Verbindungsfehler: '+(e.message||'unbekannt');}
+  btn.textContent='Zugang öffnen →';btn.disabled=false;
 }
-
-function dismissGate(){
-  const gate = document.getElementById('access-gate');
-  if(gate) gate.style.display = 'none';
-}
-
-// Show gate only if no valid token stored
-const existingToken = localStorage.getItem(GATE_KEY);
-if(existingToken) {
-  // Already authenticated — stay hidden (default)
-} else {
-  // Show gate — user needs to enter code
-  document.getElementById('access-gate').style.display = 'flex';
-}
+(function(){
+  const t=localStorage.getItem(GATE_KEY);
+  if(!t){document.getElementById('access-gate').style.display='flex';}
+})();
 </script>
-
-
 
 <!-- Word popup -->
 <div class="wpop" id="wpop">
@@ -684,19 +642,9 @@ if(existingToken) {
           <div style="flex:1"><div class="mot-n">Claude Sonnet</div><div class="mot-s">Anthropic · beste Empathie</div></div>
           <span class="mbadge mba">API</span>
         </div>
-        <div class="mopt" onclick="pickModel(this,'haiku','Claude Haiku','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
-          <div class="mot-d dc"></div>
-          <div style="flex:1"><div class="mot-n">Claude Haiku</div><div class="mot-s">Anthropic · schnell · günstig</div></div>
-          <span class="mbadge mba">API</span>
-        </div>
         <div class="mopt" onclick="pickModel(this,'gpt4','GPT-4o','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
           <div class="mot-d dc"></div>
           <div style="flex:1"><div class="mot-n">GPT-4o</div><div class="mot-s">OpenAI · sehr präzise</div></div>
-          <span class="mbadge mba">API</span>
-        </div>
-        <div class="mopt" onclick="pickModel(this,'mini','GPT-4o mini','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
-          <div class="mot-d dc"></div>
-          <div style="flex:1"><div class="mot-n">GPT-4o mini</div><div class="mot-s">OpenAI · günstig · schnell</div></div>
           <span class="mbadge mba">API</span>
         </div>
         <div class="mopt" onclick="pickModel(this,'llama','Llama 3.2','local')" style="border:.5px solid var(--bd);border-radius:var(--r)">
@@ -751,19 +699,36 @@ if(existingToken) {
     <div class="drawer-section">
       <div class="drawer-label">Audio-Transkription</div>
       <div class="drawer-field">
-        <div class="field-label">Sprache der Sprachnachrichten</div>
-        <select class="fi" id="wlang" onchange="saveSettings()">
-          <option value="de">Deutsch</option>
-          <option value="en">Englisch</option>
-          <option value="tr">Türkisch</option>
-          <option value="ar">Arabisch</option>
-          <option value="ru">Russisch</option>
-          <option value="es">Spanisch</option>
-          <option value="fr">Französisch</option>
-          <option value="it">Italienisch</option>
-          <option value="auto">Automatisch erkennen</option>
+        <div class="field-label">Engine</div>
+        <select class="fi" id="weng" onchange="updateWhisperEngineUI()">
+          <option value="openai">Whisper via Browser (direkt)</option>
+          <option value="proxy">Whisper via eigenem Backend ⭐</option>
+          <option value="local">Whisper.cpp (lokal)</option>
         </select>
-        <div style="font-size:11px;color:var(--txs);margin-top:4px">Transkription läuft über deinen Backend-Server — kein separater Whisper-Key nötig.</div>
+      </div>
+      <div id="wbackend-row" style="display:none" class="drawer-field">
+        <div class="field-label">Backend URL <span style="font-size:10px;color:var(--txs)">(von Vercel nach Deploy)</span></div>
+        <input class="fi" type="text" id="wbackend" placeholder="https://dein-projekt.vercel.app/api/transcribe">
+        <div style="font-size:11px;color:var(--txs);margin-top:3px">Key liegt sicher auf dem Server — nicht im Browser</div>
+      </div>
+      <div class="drawer-field">
+        <div class="field-label">OpenAI Key für Whisper <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--p);text-decoration:none;float:right;font-size:10.5px">Key holen ↗</a></div>
+        <input class="fi" type="password" id="wkey" placeholder="sk-proj-… oder sk-…" autocomplete="off" oninput="updateKeyStatus('whisper',this.value)">
+        <div style="font-size:11px;margin-top:3px" id="key-status-whisper"></div>
+        <div style="font-size:11px;color:var(--txs);margin-top:3px">Nur für Transkription · unabhängig vom KI-Modell</div>
+      </div>
+      <div class="drawer-field" id="proxy-field">
+        <div class="field-label" style="display:flex;align-items:center;justify-content:space-between">
+          <span>Proxy-URL <span style="font-size:10px;color:var(--acc);font-weight:500">Pflicht für Browser</span></span>
+          <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p);text-decoration:none;font-size:10.5px">Einrichten ↗</a>
+        </div>
+        <input class="fi" type="text" id="proxyUrl" placeholder="https://dein-worker.workers.dev" autocomplete="off" oninput="updateProxyStatus(this.value)">
+        <div style="font-size:11px;margin-top:3px" id="proxy-status"></div>
+        <div style="font-size:11px;color:var(--txs);margin-top:3px;line-height:1.5">Kostenloser Cloudflare Worker nötig — <strong>whisper-worker.js</strong> herunterladen und deployen</div>
+      </div>
+      <div class="drawer-field">
+        <div class="field-label">Sprache (leer = automatisch)</div>
+        <input class="fi" type="text" id="wlang" placeholder="de / en / auto">
       </div>
     </div>
 
@@ -794,33 +759,8 @@ if(existingToken) {
     </div>
 
     <div class="drawer-section">
-      <div class="drawer-label">Analyse-Tiefe</div>
-      <div style="display:flex;gap:6px">
-        <div class="detail-opt sel" data-val="simple" onclick="setGfkDetail(this,'simple')"
-          style="flex:1;padding:10px;border-radius:10px;border:.5px solid var(--bds);text-align:center;cursor:pointer;font-size:13px;transition:all .15s">
-          <div style="font-size:16px;margin-bottom:3px">◎</div>
-          <div style="font-weight:500;color:var(--p)">Einfach</div>
-          <div style="font-size:11px;color:var(--txs);margin-top:1px">Klar & kompakt</div>
-        </div>
-        <div class="detail-opt" data-val="detailed" onclick="setGfkDetail(this,'detailed')"
-          style="flex:1;padding:10px;border-radius:10px;border:.5px solid var(--bds);text-align:center;cursor:pointer;font-size:13px;transition:all .15s">
-          <div style="font-size:16px;margin-bottom:3px">✦</div>
-          <div style="font-weight:500;color:var(--p)">Detailliert</div>
-          <div style="font-size:11px;color:var(--txs);margin-top:1px">Tief & strukturiert</div>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--txs);margin-top:6px">Bestimmt wie ausführlich die GFK-Analyse ausfällt</div>
-    </div>
-
-    <div class="drawer-section">
-      <div class="drawer-label" style="display:flex;align-items:center;justify-content:space-between">
-        <span id="t-outlang">Ausgabe-Sprache</span>
-        <span style="font-size:12px;color:var(--txs)">
-          <span id="outputLangFlag">🇩🇪</span>
-          <span id="outputLangName" style="font-weight:500;color:var(--p)">DE</span>
-        </span>
-      </div>
-      <div style="font-size:12px;color:var(--txs);margin-bottom:8px">Sprache der GFK-Analyse — unabhängig von Eingabe und App-Sprache</div>
+      <div class="drawer-label">Ausgabe-Sprache</div>
+      <div style="font-size:12px;color:var(--txs);margin-bottom:8px">Egal in welcher Sprache die Eingabe ist — die Analyse erscheint in dieser Sprache</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="lang-opts">
         <div class="lang-opt sel" onclick="pickLang(this,'de','Deutsch')"><span class="lang-flag">🇩🇪</span> Deutsch</div>
         <div class="lang-opt" onclick="pickLang(this,'en','English')"><span class="lang-flag">🇬🇧</span> English</div>
@@ -837,13 +777,8 @@ if(existingToken) {
       </div>
     </div>
 
-    <div style="padding:16px 20px 0;display:flex;flex-direction:column;gap:8px">
+    <div style="padding:16px 20px 0">
       <button class="btn btn-ghost" style="width:100%" onclick="closeSettings()">Fertig</button>
-      <div style="display:flex;justify-content:center;gap:16px;padding-top:4px">
-        <a href="https://resonanz.chat" style="font-size:11.5px;color:var(--txs);text-decoration:none">Über Resonanz</a>
-        <a href="./impressum.html" style="font-size:11.5px;color:var(--txs);text-decoration:none">Impressum</a>
-        <a href="./datenschutz.html" style="font-size:11.5px;color:var(--txs);text-decoration:none">Datenschutz</a>
-      </div>
     </div>
   </div>
 </div>
@@ -854,11 +789,8 @@ if(existingToken) {
   <!-- Install banner (auto, Chrome only) -->
   <div class="install-bar" id="installBar">
     <div class="install-bar-text">
-      <div class="install-bar-icon">📲</div>
-      <div class="install-bar-copy">
-        <div class="install-bar-title">Resonanz installieren</div>
-        <div class="install-bar-sub">Dann erscheint die App im Teilen-Menü von WhatsApp & Co.</div>
-      </div>
+      <span style="font-size:20px">📲</span>
+      <span><strong>Resonanz installieren</strong> — für WhatsApp-Teilen-Integration</span>
     </div>
     <div class="install-bar-acts">
       <button class="install-btn install-btn-yes" onclick="doInstall()">Installieren</button>
@@ -868,51 +800,28 @@ if(existingToken) {
 
   <!-- Header -->
   <div class="hdr">
-    <div class="hdr-brand"><a href="https://resonanz.chat" style="color:var(--p);text-decoration:none">Resonanz</a></div>
-    <div class="hdr-right" style="position:relative">
-
-      <!-- KI-Modell Schnellauswahl -->
-      <div class="mpill" id="mpill" onclick="toggleModelQuick(event)" title="KI-Modell wechseln" style="cursor:pointer">
+    <div class="hdr-brand">Resonanz</div>
+    <div class="hdr-right">
+      <div class="mpill" id="mpill" onclick="openSettings()" title="KI-Modell wechseln" style="cursor:pointer">
         <div class="mdot" id="pdot"></div>
-        <span id="plbl">Claude</span>
+        <span id="plbl">Claude Sonnet</span>
       </div>
-      <div class="model-quick" id="modelQuick">
-        <div class="mq-opt sel" id="mq-claude" onclick="setModelQuick('claude','Claude Sonnet','cloud')">
-          <div class="mq-dot"></div>Claude Sonnet <span style="font-size:10px;opacity:.5">smart</span>
-        </div>
-        <div class="mq-opt" id="mq-haiku" onclick="setModelQuick('haiku','Claude Haiku','cloud')">
-          <div class="mq-dot"></div>Claude Haiku <span style="font-size:10px;opacity:.5">schnell</span>
-        </div>
-        <div class="mq-opt" id="mq-gpt4" onclick="setModelQuick('gpt4','GPT-4o','cloud')">
-          <div class="mq-dot"></div>GPT-4o <span style="font-size:10px;opacity:.5">smart</span>
-        </div>
-        <div class="mq-opt" id="mq-mini" onclick="setModelQuick('mini','GPT-4o mini','cloud')">
-          <div class="mq-dot"></div>GPT-4o mini <span style="font-size:10px;opacity:.5">günstig</span>
-        </div>
-        <div class="mq-opt" id="mq-llama" onclick="setModelQuick('llama','Llama 3.2','local')">
-          <div class="mq-dot loc"></div>Llama 3.2
-        </div>
-        <div class="mq-opt" id="mq-mistral" onclick="setModelQuick('mistral','Mistral 7B','local')">
-          <div class="mq-dot loc"></div>Mistral 7B
-        </div>
+      <div class="lang-pill" id="langPill" onclick="openSettings()" title="Ausgabe-Sprache ändern">
+        <span id="langFlag">🇩🇪</span>
+        <span id="langName">DE</span>
       </div>
-
-      <!-- App-Sprache DE / EN (Oberfläche) -->
-      <div class="lang-pill" id="uiLangPill" onclick="toggleUiLang()" title="App language" style="cursor:pointer">
-        <span id="uiLangFlag">🇩🇪</span>
-        <span id="uiLangName">DE</span>
-      </div>
+      <button class="ibtn" id="installBtn" onclick="showInstallGuide()" title="App installieren" style="display:none">📲</button>
       <button class="ibtn" onclick="openSettings()" title="Einstellungen">⚙</button>
     </div>
   </div>
 
   <!-- Step nav -->
   <div class="steps">
-    <button class="step act" id="step-1" onclick="goStep(1)"><div class="step-num">1</div><span class="step-label">Eingabe</span></button>
-    <button class="step" id="step-2" onclick="goStep(2)"><div class="step-num">2</div><span class="step-label">Analyse</span></button>
-    <button class="step" id="step-3" onclick="goStep(3)"><div class="step-num">3</div><span class="step-label">Training</span></button>
-    <button class="step" id="step-4" onclick="goStep(4)"><div class="step-num">◎</div><span class="step-label">Verlauf</span></button>
-    <button class="step" id="step-5" onclick="goStep(5)"><div class="step-num">◈</div><span class="step-label">Karte</span></button>
+    <button class="step act" id="step-1" onclick="goStep(1)"><div class="step-num">1</div>Eingabe</button>
+    <button class="step" id="step-2" onclick="goStep(2)"><div class="step-num">2</div>Analyse</button>
+    <button class="step" id="step-3" onclick="goStep(3)"><div class="step-num">3</div>Training</button>
+    <button class="step" id="step-4" onclick="goStep(4)"><div class="step-num">◎</div>Verlauf</button>
+    <button class="step" id="step-5" onclick="goStep(5)"><div class="step-num">◈</div>Karte</button>
   </div>
 
   <!-- Screens -->
@@ -963,7 +872,7 @@ if(existingToken) {
             <div class="drop" id="adrop" onclick="document.getElementById('aIn').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="doDrop(event)">
               <div class="drop-icon">🎙</div>
               <div class="drop-title">Audionachrichten auswählen</div>
-              <div class="drop-sub">Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG, OPUS · beliebige Länge</div>
+              <div class="drop-sub">Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG · max 25 MB</div>
             </div>
             <input type="file" id="aIn" accept="audio/*" multiple onchange="addFiles(this.files)" style="display:none">
             <div class="alist" id="alist"></div>
@@ -1014,11 +923,7 @@ if(existingToken) {
         </div>
       </div>
 
-      <!-- Detail level + Action -->
-      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px">
-        <div class="detail-opt sel" data-val="simple" onclick="setGfkDetail(this,'simple')" style="font-size:12px;padding:5px 14px;border-radius:16px;cursor:pointer;border:.5px solid var(--bd);background:var(--p);color:white;transition:all .15s">Einfach</div>
-        <div class="detail-opt" data-val="detailed" onclick="setGfkDetail(this,'detailed')" style="font-size:12px;padding:5px 14px;border-radius:16px;cursor:pointer;border:.5px solid var(--bd);background:transparent;color:var(--txm);transition:all .15s">Detailliert</div>
-      </div>
+      <!-- Action -->
       <div class="next-row">
         <button class="btn btn-primary" id="analyseBtn" onclick="runAnalysis()">
           <span class="bi">✦</span><div class="spin"></div>
@@ -1258,94 +1163,11 @@ if(existingToken) {
 const BACKEND = 'https://resonanz-backend.vercel.app'; // ← deine URL nach dem Deploy
 
 const S={
-  model:'claude',mtype:'cloud',tab:'text',src:'partner',gfkDetail:'simple',outputLang:'de',outputLangName:'Deutsch',outputLangFlag:'🇩🇪',
+  model:'claude',mtype:'cloud',tab:'text',src:'partner',outputLang:'de',outputLangName:'Deutsch',outputLangFlag:'🇩🇪',
   togs:{self:true,resp:true,sum:true,trig:true,train:true},
   afiles:[],transcripts:[],popWord:null,
   lastGFK:null,curStep:1
 };
-
-// ── Settings Persistence ─────────────────────────────────────
-const SETTINGS_KEY = 'resonanz_settings_v1';
-
-function saveSettings(){
-  try{
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
-      model: S.model,
-      mtype: S.mtype,
-      modelLabel: document.getElementById('plbl')?.textContent || 'Claude Sonnet',
-      outputLang: S.outputLang,
-      outputLangName: S.outputLangName,
-      outputLangFlag: S.outputLangFlag,
-      togs: S.togs,
-      src: S.src,
-      uiLang: localStorage.getItem('resonanz_ui_lang')||'de',
-      wlang: document.getElementById('wlang')?.value || 'de',
-      gfkDetail: S.gfkDetail||'simple',
-    }));
-  }catch(e){}
-}
-
-function loadSettings(){
-  try{
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if(!raw) return;
-    const p = JSON.parse(raw);
-
-    // Model
-    if(p.model){
-      setModel(p.model, p.modelLabel||p.model, p.mtype||'cloud');
-      // Sync settings drawer
-      document.querySelectorAll('#model-opts .mopt').forEach(o=>{
-        o.classList.remove('sel'); o.style.background='';
-        if((o.getAttribute('onclick')||'').includes("'"+p.model+"'"))
-          {o.classList.add('sel'); o.style.background='rgba(42,71,64,.06)';}
-      });
-    }
-
-    // Output language
-    if(p.outputLang){
-      S.outputLang = p.outputLang;
-      S.outputLangName = p.outputLangName||p.outputLang;
-      S.outputLangFlag = p.outputLangFlag||'🇩🇪';
-      // Sync lang-opts
-      document.querySelectorAll('#lang-opts .lang-opt').forEach(o=>{
-        o.classList.remove('sel');
-        if((o.getAttribute('onclick')||'').includes("'"+p.outputLang+"'"))
-          o.classList.add('sel');
-      });
-      const oFlag = document.getElementById('outputLangFlag');
-      const oName = document.getElementById('outputLangName');
-      if(oFlag) oFlag.textContent = p.outputLangFlag||'🇩🇪';
-      if(oName) oName.textContent = p.outputLang.toUpperCase();
-    }
-
-    // Toggles
-    if(p.togs){
-      S.togs = {...S.togs, ...p.togs};
-      Object.entries(p.togs).forEach(([k,v])=>{
-        const sw = document.getElementById('tsw-'+k);
-        if(sw){ sw.classList.toggle('on', v); }
-      });
-    }
-
-    // Audio language
-    if(p.wlang){
-      const wl = document.getElementById('wlang');
-      if(wl) wl.value = p.wlang;
-    }
-
-    // GFK detail level
-    if(p.gfkDetail){
-      S.gfkDetail = p.gfkDetail;
-      document.querySelectorAll('.detail-opt').forEach(o=>{
-        o.classList.toggle('sel', o.dataset.val === p.gfkDetail);
-      });
-    }
-
-  }catch(e){ console.warn('loadSettings error:', e); }
-}
-
-
 
 // ── Model selection (settings drawer only) ────────
 function pickModel(el,id,lbl,type){
@@ -1354,33 +1176,21 @@ function pickModel(el,id,lbl,type){
     o.classList.remove('sel');o.style.background='';
   });
   el.classList.add('sel');el.style.background='rgba(42,71,64,.06)';
-  document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
-  const mq=document.getElementById('mq-'+id);
-  if(mq)mq.classList.add('sel');
-  saveSettings();
 }
 function setModel(id,lbl,type){
   S.model=id;S.mtype=type;
   document.getElementById('plbl').textContent=lbl;
   const d=document.getElementById('pdot');d.className='mdot'+(type==='local'?' loc':'');
-  // Show/hide key fields
-  const kc=document.getElementById('key-claude');
-  const ko=document.getElementById('key-openai');
-  const kl=document.getElementById('key-ollama');
-  if(kc)kc.style.display=(id==='claude'||id==='haiku')?'':'none';
-  if(ko)ko.style.display=(id==='gpt4'||id==='mini')?'':'none';
-  if(kl)kl.style.display=type==='local'?'':'none';
-  // Always sync header quick dropdown
-  document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
-  const mq=document.getElementById('mq-'+id);
-  if(mq)mq.classList.add('sel');
+  document.getElementById('key-claude').style.display=id==='claude'?'':'none';
+  document.getElementById('key-openai').style.display=id==='gpt4'?'':'none';
+  document.getElementById('key-ollama').style.display=type==='local'?'':'none';
 }
 
 // ── Settings drawer ───────────────────────────────
 function openSettings(){document.getElementById('settingsOv').classList.add('open')}
 function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
 function showInstallGuide(){
-  const el=document.getElementById('installGuideOv');
+  var el=document.getElementById('installGuideOv');
   if(el)el.classList.add('open');
   else if(deferredInstall)doInstall();
   else showToast('Im Browser-Menü: Zum Startbildschirm hinzufügen');
@@ -1415,9 +1225,9 @@ function saveKeys() {
   const data = {
     ckey: document.getElementById('ckey').value.trim(),
     okey: document.getElementById('okey').value.trim(),
-    wkey: '', // whisper key handled by backend
+    wkey: document.getElementById('wkey').value.trim(),
     olurl: document.getElementById('olurl').value.trim(),
-    
+    proxyUrl: document.getElementById('proxyUrl')?.value.trim()||'',
     model: S.model,
     mtype: S.mtype,
     ts: Date.now()
@@ -1442,9 +1252,10 @@ function loadKeys(pin) {
     if (!data.ckey && !data.okey && !data.wkey) return false;
     if (data.ckey) document.getElementById('ckey').value = data.ckey;
     if (data.okey) document.getElementById('okey').value = data.okey;
-    // wkey handled by backend
+    if (data.wkey) document.getElementById('wkey').value = data.wkey;
     if (data.olurl) document.getElementById('olurl').value = data.olurl;
-
+    if (data.proxyUrl) { const el=document.getElementById('proxyUrl'); if(el) el.value=data.proxyUrl; }
+    if (data.proxyUrl) { const pe=document.getElementById('proxyUrl'); if(pe)pe.value=data.proxyUrl; }
     if (data.model) setModel(data.model,
       {claude:'Claude Sonnet',gpt4:'GPT-4o',llama:'Llama 3.2',mistral:'Mistral 7B'}[data.model]||data.model,
       data.mtype||'cloud');
@@ -1455,12 +1266,8 @@ function loadKeys(pin) {
       if (el && val) { el.textContent='✓ Geladen'; el.style.color='var(--p)'; }
     });
     showKeysSavedState(true);
-    // Sync header quick dropdown with loaded model
-    document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
-    const mqLoaded=document.getElementById('mq-'+data.model);
-    if(mqLoaded)mqLoaded.classList.add('sel');
     return true;
-  } catch(e) { console.error('loadKeys error:',e); return false; }
+  } catch { return false; }
 }
 
 function clearSavedKeys() {
@@ -1468,7 +1275,7 @@ function clearSavedKeys() {
   localStorage.removeItem(KEY_STORE);
   document.getElementById('ckey').value = '';
   document.getElementById('okey').value = '';
-  // wkey handled by backend
+  document.getElementById('wkey').value = '';
   showKeysSavedState(false);
   showToast('Keys gelöscht');
 }
@@ -1516,6 +1323,8 @@ function tryLoadPin(pin) {
     document.getElementById('pin-input').value = '';
   }
 }
+
+
 
 function updateKeyStatus(which, val) {
   const el = document.getElementById('key-status-'+which);
@@ -1570,35 +1379,27 @@ function updatePillStatus() {
 }
 
 // ── Toggle switches ───────────────────────────────
-function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on');saveSettings();}
+function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
 
-function updateWhisperEngineUI(){}
-
-// ── Output language ───────────────────────────────
-function setGfkDetail(el, val){
-  S.gfkDetail = val;
-  document.querySelectorAll('.detail-opt').forEach(o=>{
-    const isSelected = o.dataset.val === val;
-    o.classList.toggle('sel', isSelected);
-    o.style.background = isSelected ? 'rgba(42,71,64,.07)' : '';
-    o.style.borderColor = isSelected ? 'var(--p)' : '';
-  });
-  saveSettings();
-  showToast(val === 'detailed' ? 'Detaillierte Analyse ✓' : 'Kompakte Analyse ✓');
+function updateWhisperEngineUI(){
+  const eng=document.getElementById('weng').value;
+  document.getElementById('wbackend-row').style.display=eng==='proxy'?'':'none';
+  const wkeyRow=document.getElementById('wkey')?.closest('.drawer-field');
+  if(wkeyRow)wkeyRow.style.display=eng==='proxy'?'none':'';
 }
 
+// ── Output language ───────────────────────────────
 function pickLang(el,code,name){
   S.outputLang=code;S.outputLangName=name;
+  // Derive flag from code
   const flags={de:'🇩🇪',en:'🇬🇧',es:'🇪🇸',fr:'🇫🇷',it:'🇮🇹',tr:'🇹🇷',ar:'🇸🇦',ru:'🇷🇺',zh:'🇨🇳',ja:'🇯🇵',pt:'🇧🇷',nl:'🇳🇱'};
   S.outputLangFlag=flags[code]||'🌐';
-  // Update output-lang indicator in settings ONLY (not the header UI-lang pill)
-  const oFlag=document.getElementById('outputLangFlag');
-  const oName=document.getElementById('outputLangName');
-  if(oFlag)oFlag.textContent=S.outputLangFlag;
-  if(oName)oName.textContent=code.toUpperCase();
+  // Update pill
+  document.getElementById('langFlag').textContent=S.outputLangFlag;
+  document.getElementById('langName').textContent=code.toUpperCase();
+  // Update selector
   document.querySelectorAll('#lang-opts .lang-opt').forEach(o=>o.classList.remove('sel'));
   el.classList.add('sel');
-  saveSettings();
 }
 
 // ── Steps ─────────────────────────────────────────
@@ -1745,9 +1546,7 @@ async function transcribeAll(){
   if(tb){tb.disabled=false;tb.classList.remove('ld');}
 }
 
-
 async function trOpenAI(file,lang){
-  // .opus → .ogg (same codec, Whisper doesn't accept .opus filename)
   let sendFile=file;
   if(file.name.toLowerCase().endsWith('.opus')){
     sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
@@ -1755,12 +1554,11 @@ async function trOpenAI(file,lang){
   const fd=new FormData();
   fd.append('audio',sendFile);
   const r=await fetch(BACKEND+'/api/transcribe?lang='+encodeURIComponent(lang||'de'),{
-    method:'POST',
-    body:fd
+    method:'POST',body:fd
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
-    throw new Error(e.error||`Transkription Fehler ${r.status}`);
+    throw new Error(e.error||'Transkription Fehler '+r.status);
   }
   const d=await r.json();
   const words=(d.words||[]).map(w=>({
@@ -1769,6 +1567,7 @@ async function trOpenAI(file,lang){
   }));
   return{text:d.text,words};
 }
+
 function simTR(){
   const base=[
     {word:'Ich',start:.1,end:.4,prob:.98},{word:'wollte',start:.4,end:.75,prob:.95},{word:'dir',start:.8,end:.95,prob:.97},
@@ -1844,88 +1643,28 @@ document.getElementById('wpop-in').addEventListener('keydown',e=>{if(e.key==='En
 function getText(){
   if(S.tab==='text')return document.getElementById('msgIn').value.trim();
   if(S.tab==='chat')return document.getElementById('chatIn').value.trim();
-  if(S.tab==='audio'){
-    if(!S.transcripts.length)return '';
-    if(S.transcripts.length===1)return S.transcripts[0].text;
-    // Multiple files: label each and combine
-    return S.transcripts.map((t,i)=>`[Nachricht ${i+1} – ${t.name}]:\n${t.text}`).join('\n\n');
-  }
+  if(S.tab==='audio')return S.transcripts.map(t=>`[${t.name}]: ${t.text}`).join('\n\n');
   return'';
 }
 
 // ── Prompts ───────────────────────────────────────
-
-
-
-function buildGFKPrompt(msg, ctx){
+function buildGFKPrompt(msg,ctx){
   const srcMap={partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'};
   const lang=S.outputLang||'de';
-  const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ar:'أجب باللغة العربية.',ru:'Отвечай на русском языке.',zh:'用中文回答。',ja:'日本語で回答してください。',pt:'Responda em português.',nl:'Antwoord in het Nederlands.'};
-  const langInstr = langMap[lang] || 'Respond in '+lang+'.';
-  const src = srcMap[S.src]||'einer anderen Person';
-  const isDetailed = S.gfkDetail === 'detailed';
-  const ctxPart = ctx ? '\nKontext: '+ctx : '';
-  const msgPart = '\nNachricht von '+src+': "'+msg+'"';
-
-  if(isDetailed){
-    return `You are a deeply empathetic NVC (Nonviolent Communication) coach. ${langInstr} Analyze thoroughly.${ctxPart}${msgPart}
-
-Reply ONLY with valid JSON, no markdown:
-{
-  "self": {
-    "observation": "Exact factual observation without interpretation",
-    "feeling": "The genuine NVC feeling behind this message",
-    "need": "The deep universal human need driving this feeling",
-    "need_context": "Why this need matters in this relationship dynamic",
-    "request": "A concrete doable request I could make of myself right now",
-    "old_pattern": "What old relational pattern or wound might this activate?"
-  },
-  "response": "Empathetic NVC response to send (3-5 sentences, warm and connecting)",
-  "response_tip": "One specific tip for tone, timing, or context",
-  "summary": "Neutral 3-4 sentence summary of the dynamic",
-  "communication_pattern": "Name the communication pattern in this message",
-  "relationship_insight": "One deeper insight about this relationship dynamic",
-  "tags": ["tag1","tag2","tag3"],
-  "triggers": [{"phrase":"exact phrase","explanation":"which wound does this activate?","somatic":"possible body sensation"}],
-  "growth_impulse": "One concrete thing to practice or reflect on"
-}`;
-  }
-
-  // Simple mode — structured but concise
-  return `You are an empathetic NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
-
-Reply ONLY with valid JSON, no markdown:
-{
-  "self": {
-    "observation": "What was factually said or done (one sentence, no interpretation)",
-    "feeling": "The main feeling this likely triggers in the receiver",
-    "need": "The core human need behind this feeling",
-    "request": "One concrete thing I could do or ask for right now"
-  },
-  "response": "A warm, clear NVC response to send (2-3 sentences)",
-  "summary": "2-3 sentence neutral summary of what is really being communicated",
-  "tags": ["tag1","tag2"],
-  "triggers": [{"phrase":"most triggering phrase","explanation":"brief explanation"}]
-}`;
-}`;
-  } else {
-    return `You are a warm NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
-
-Reply ONLY with valid JSON, no markdown.
-
-{
-  "self": {
-    "observation": "What was actually said/done (factual, no judgment)",
-    "feeling": "The feeling this message likely expresses",
-    "need": "The underlying universal human need",
-    "request": "A simple request I could make of myself"
-  },
-  "response": "A warm, empathetic NVC response to send (2-3 sentences)",
-  "summary": "Neutral summary in 2-3 clear sentences",
-  "tags": ["tag1", "tag2"],
-  "triggers": [{"phrase": "triggering phrase", "explanation": "why this triggers a reaction"}]
-}`;
-  }
+  const langInstr=lang==='de'?'Antworte auf Deutsch.'
+    :lang==='en'?'Respond in English.'
+    :lang==='es'?'Responde en español.'
+    :lang==='fr'?'Réponds en français.'
+    :lang==='it'?'Rispondi in italiano.'
+    :lang==='tr'?'Türkçe yanıt ver.'
+    :lang==='ar'?'أجب باللغة العربية.'
+    :lang==='ru'?'Отвечай на русском языке.'
+    :lang==='zh'?'用中文回答。'
+    :lang==='ja'?'日本語で回答してください。'
+    :lang==='pt'?'Responda em português.'
+    :lang==='nl'?'Antwoord in het Nederlands.'
+    :`Respond in ${S.outputLangName||lang}.`;
+  return`You are a NVC (Nonviolent Communication) coach. Analyze the message from ${srcMap[S.src]||'a person'}. ${langInstr} Reply ONLY with valid JSON — no markdown, no explanation outside JSON.\n\n${ctx?'Context: '+ctx+'\n':''}Message: "${msg}"\n\n{"self":{"observation":"factual observation without judgment","feeling":"concrete NVC feeling","need":"deep universal need","request":"request to myself"},"response":"empathetic NVC response 2-4 sentences","summary":"neutral summary 2-3 sentences","tags":["tag1","tag2"],"triggers":[{"phrase":"triggering phrase","explanation":"which old pattern does this activate?"}]}`;
 }
 function buildTrainPrompt(origMsg,gfk,userResp,ctx){
   const lang=S.outputLang||'de';
@@ -1970,24 +1709,14 @@ async function callAPI(prompt){
   }
 
   // Cloud-Modelle → über Resonanz-Backend (kein Key im Browser)
-  // Map model IDs to API names
-  const modelMap={claude:'claude',haiku:'haiku',gpt4:'gpt4',mini:'mini'};
   const r=await fetch(BACKEND+'/api/analyse',{
     method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-resonanz-token': localStorage.getItem('resonanz_token_v1')||''
-    },
-    body:JSON.stringify({prompt,model:modelMap[S.model]||S.model})
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({prompt,model:S.model})
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
-    const msg=e.error||'';
-    if(msg.toLowerCase().includes('credit')||msg.toLowerCase().includes('quota')||msg.toLowerCase().includes('billing')||msg.toLowerCase().includes('insufficient')||r.status===402){
-      showUsageError(S.model==='claude'?'Anthropic':'OpenAI');
-      throw new Error('usage_exhausted');
-    }
-    throw new Error(msg||'Server-Fehler '+r.status+' — Backend erreichbar?');
+    throw new Error(e.error||`Server-Fehler ${r.status} — Backend erreichbar?`);
   }
   const d=await r.json();
   return d.result;
@@ -2134,16 +1863,6 @@ function renderAnalysis(r,msg){
   }else document.getElementById('rc-trig').style.display='none';
 
   document.getElementById('rc-train-hint').style.display=t.train?'':'none';
-
-  // Render extra detailed fields if present
-  const commPat=document.getElementById('gCommPattern');
-  const relInsight=document.getElementById('gRelInsight');
-  const growthImp=document.getElementById('gGrowthImpulse');
-  if(commPat)commPat.closest('.res-card')?commPat.closest('.res-card').style.display=(r.communication_pattern?'':'none'):null;
-  if(commPat&&r.communication_pattern)commPat.textContent=r.communication_pattern;
-  if(relInsight&&r.relationship_insight)relInsight.textContent=r.relationship_insight;
-  if(growthImp&&r.growth_impulse)growthImp.textContent=r.growth_impulse;
-  if(r.response_tip){const tip=document.getElementById('gRespTip');if(tip){tip.textContent=r.response_tip;tip.style.display='';}}
 
   // Auto-save to journal
   saveEntry(r, msg);
@@ -2795,7 +2514,7 @@ window.addEventListener('resize',()=>{if(S.curStep===5)resizeMap();});
 let deferredInstall=null;
 
 // Version bump — clears old dismissed flag so banner shows again
-const PWA_VERSION='v4-resonanz';
+const PWA_VERSION='v3-external';
 if(localStorage.getItem('pwa_version')!==PWA_VERSION){
   localStorage.removeItem('pwa_dismissed');
   localStorage.setItem('pwa_version',PWA_VERSION);
@@ -2864,22 +2583,7 @@ function showShareBanner(type,count){
   b.innerHTML=`<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:15px;margin-left:4px">✕</button>`;
   setTimeout(()=>{if(b&&b.parentElement)b.remove();},5000);
 }
-setTimeout(()=>{
-  // Only apply share if gate is dismissed
-  const gate=document.getElementById('access-gate');
-  if(!gate||gate.style.display==='none'){
-    applyPendingShare();
-  } else {
-    // Wait for gate to be dismissed, then apply
-    const observer=new MutationObserver(()=>{
-      if(gate.style.display==='none'){
-        observer.disconnect();
-        applyPendingShare();
-      }
-    });
-    observer.observe(gate,{attributes:true,attributeFilter:['style']});
-  }
-},400);
+setTimeout(applyPendingShare,400);
 // Also re-check when SW signals completion
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{
@@ -2896,203 +2600,22 @@ if('serviceWorker' in navigator){
   }
 })();
 
-
-// ── UI Language DE/EN ─────────────────────────────────────────
-const UI_LANG_KEY='resonanz_ui_lang';
-let uiLang=localStorage.getItem(UI_LANG_KEY)||'de';
-
-const T={
-  de:{
-    // Steps
-    step1:'Eingabe',step2:'Analyse',step3:'Training',step4:'Verlauf',step5:'Karte',
-    // Buttons
-    analyse:'✦ GFK-Analyse starten',transcribe:'Jetzt transkribieren',
-    training:'Training starten',reset:'Zurücksetzen',
-    // Input section
-    placeholder:'Nachricht hier eingeben…',
-    context:'Kontext (optional) — hilft der KI besser zu verstehen:',
-    from:'Diese Nachricht kommt von:',
-    audioTitle:'Audionachrichten auswählen',
-    audioSub:'Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG, OPUS · beliebige Länge',
-    chatPlaceholder:'WhatsApp/Telegram Chat-Export hier einfügen…',
-    // Chips
-    partner:'Partner·in',mother:'Mutter',father:'Vater',
-    friend:'Freund·in',colleague:'Kolleg·in',other:'Andere',
-    // Settings
-    settings:'Einstellungen',model:'KI-Modell',outputLang:'Ausgabe-Sprache',
-    modules:'Ausgabe-Module',audio:'Audio-Transkription',audioLang:'Sprache der Aufnahme',
-    done:'Fertig',
-    // Tabs
-    tabText:'Text',tabAudio:'Audio',tabChat:'Chat',
-    // Misc
-    noMsg:'Bitte zuerst eine Nachricht eingeben.',
-    saving:'Keys gespeichert 🔒',
-    unlock:'Keys entsperren',pin:'4-stellige PIN eingeben',
-    pinBtn:'Zugang öffnen →',
-    pinBack:'← Zur Startseite',
-  },
-  en:{
-    step1:'Input',step2:'Analysis',step3:'Training',step4:'Journal',step5:'Map',
-    analyse:'✦ Start NVC Analysis',transcribe:'Transcribe now',
-    training:'Start training',reset:'Reset',
-    placeholder:'Enter message here…',
-    context:'Context (optional) — helps the AI understand better:',
-    from:'This message is from:',
-    audioTitle:'Select voice messages',
-    audioSub:'Multiple at once · MP3, M4A, WAV, OGG, OPUS · any length',
-    chatPlaceholder:'Paste WhatsApp/Telegram chat export here…',
-    partner:'Partner',mother:'Mother',father:'Father',
-    friend:'Friend',colleague:'Colleague',other:'Other',
-    settings:'Settings',model:'AI Model',outputLang:'Output Language',
-    modules:'Output Modules',audio:'Audio Transcription',audioLang:'Recording language',
-    done:'Done',
-    tabText:'Text',tabAudio:'Audio',tabChat:'Chat',
-    noMsg:'Please enter a message first.',
-    saving:'Keys saved 🔒',
-    unlock:'Unlock keys',pin:'Enter 4-digit PIN',
-    pinBtn:'Open →',
-    pinBack:'← Back to home',
-  }
-};
-
-function applyUiLang(lang){
-  uiLang=lang;
-  localStorage.setItem(UI_LANG_KEY,lang);
-  const t=T[lang]||T.de;
-  const isEn=lang==='en';
-
-  // Header UI lang pill
-  const uf=document.getElementById('uiLangFlag');
-  const un=document.getElementById('uiLangName');
-  if(uf)uf.textContent=isEn?'🇬🇧':'🇩🇪';
-  if(un)un.textContent=lang.toUpperCase();
-
-  // Steps
-  ['1','2','3','4','5'].forEach(n=>{
-    const lbl=document.querySelector('#step-'+n+' .step-label');
-    if(lbl)lbl.textContent=t['step'+n];
-  });
-
-  // Buttons
-  const ab=document.getElementById('analyseBtn');
-  if(ab)ab.innerHTML=t.analyse;
-  const tb=document.getElementById('transcribeBtn');
-  if(tb)tb.textContent=t.transcribe;
-  const trainBtn=document.getElementById('trainBtn');
-  if(trainBtn)trainBtn.textContent=t.training;
-
-  // Input placeholders
-  const mi=document.getElementById('msgIn');
-  if(mi)mi.placeholder=t.placeholder;
-  const cx=document.getElementById('ctxIn');
-  if(cx)cx.placeholder=t.context;
-  const ci=document.getElementById('chatIn');
-  if(ci)ci.placeholder=t.chatPlaceholder||t.placeholder;
-
-  // Tabs
-  document.querySelectorAll('.itab').forEach(tab=>{
-    const oc=tab.getAttribute('onclick')||'';
-    if(oc.includes("'text'"))tab.innerHTML='✦ '+t.tabText;
-    else if(oc.includes("'audio'"))tab.innerHTML='◎ '+t.tabAudio;
-    else if(oc.includes("'chat'"))tab.innerHTML='⊞ '+t.tabChat;
-  });
-
-  // Source chips — map by onclick value
-  const chipMap={partner:t.partner,mother:t.mother,father:t.father,
-    friend:t.friend,colleague:t.colleague,other:t.other};
-  document.querySelectorAll('.chip').forEach(c=>{
-    const oc=c.getAttribute('onclick')||'';
-    for(const key of Object.keys(chipMap)){
-      if(oc.includes("'"+key+"'")){c.textContent=chipMap[key];break;}
-    }
-  });
-
-  // Audio drop zone
-  const dt=document.querySelector('.drop-title');
-  if(dt)dt.textContent=t.audioTitle||'Audionachrichten auswählen';
-  const ds=document.querySelector('.drop-sub');
-  if(ds)ds.textContent=t.audioSub||'Mehrere gleichzeitig möglich';
-
-  // Settings title (drawer-title)
-  const settTitle=document.querySelector('.drawer-title');
-  if(settTitle)settTitle.textContent=t.settings||'Einstellungen';
-
-  // Output lang label in settings
-  const ol=document.getElementById('t-outlang');
-  if(ol)ol.textContent=t.outputLang||'Ausgabe-Sprache';
-
-  // Gate texts
-  const gSub=document.querySelector('.gate-sub');
-  if(gSub)gSub.innerHTML=isEn
-    ?'Enter your access code<br>to open the app.'
-    :'Gib deinen Zugangscode ein<br>um die App zu öffnen.';
-  const gBtn=document.getElementById('gate-btn');
-  if(gBtn&&!gBtn.disabled)gBtn.textContent=t.pinBtn||'Zugang öffnen →';
-  const gBack=document.querySelector('.gate-back');
-  if(gBack)gBack.textContent=isEn?'← Back to home':'← Zur Startseite';
-
-  document.documentElement.lang=lang;
-}
-
-function toggleUiLang(){applyUiLang(uiLang==='de'?'en':'de');}
-
-// ── Model quick-select ────────────────────────────────────────
-function toggleModelQuick(e){
-  if(e)e.stopPropagation();
-  const d=document.getElementById('modelQuick');
-  d.classList.toggle('open');
-  if(d.classList.contains('open')){
-    const close=function(ev){
-      if(!d.contains(ev.target)&&ev.target.id!=='mpill'){
-        d.classList.remove('open');
-        document.removeEventListener('click',close);
-      }
-    };
-    setTimeout(()=>document.addEventListener('click',close),50);
-  }
-}
-
-function setModelQuick(id,lbl,type){
-  setModel(id,lbl,type);
-  document.getElementById('modelQuick').classList.remove('open');
-  // Sync quick dropdown
-  document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
-  const mq=document.getElementById('mq-'+id);
-  if(mq)mq.classList.add('sel');
-  // Sync settings drawer
-  document.querySelectorAll('#model-opts .mopt').forEach(o=>{
-    o.classList.remove('sel');o.style.background='';
-  });
-  document.querySelectorAll('#model-opts .mopt').forEach(o=>{
-    if((o.getAttribute('onclick')||'').includes("'"+id+"'"))
-      {o.classList.add('sel');o.style.background='rgba(42,71,64,.06)';}
-  });
-}
-
-// ── Usage exhausted error ─────────────────────────────────────
-function showUsageError(service){
-  const old=document.getElementById('api-error-card');if(old)old.remove();
-  const url=service==='Anthropic'?'https://console.anthropic.com/settings/billing':'https://platform.openai.com/settings/billing';
-  const card=document.createElement('div');
-  card.id='api-error-card';card.className='err-card';
-  card.innerHTML='<div class="err-icon">⚡</div><div style="flex:1"><div class="err-title">Guthaben aufgebraucht</div><div class="err-msg">Dein '+service+'-Guthaben ist erschöpft. Bitte Guthaben aufladen um weiterzumachen.</div><div class="err-actions"><a class="err-btn pri" href="'+url+'" target="_blank">Guthaben aufladen ↗</a><button class="err-btn sec" onclick="this.closest(\'.err-card\').remove()">Schließen</button></div></div>';
-  const s1=document.getElementById('screen-1');
-  if(s1)s1.appendChild(card);
-  card.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-(function(){applyUiLang(uiLang);})();
-
-// ── Init: load persisted settings ───────────────
-(function(){ loadSettings(); })();
-
-// ── Init: load saved keys ────────────────────────
+// ── Init: load saved keys if stored ─────────────
 (function(){
   if(localStorage.getItem(KEY_STORE)){
     showKeysSavedState(true);
     promptPinAndLoad();
   }
 })();
+
+function showUsageError(service){
+  const old=document.getElementById('api-error-card');if(old)old.remove();
+  const url=service==='Anthropic'?'https://console.anthropic.com/settings/billing':'https://platform.openai.com/settings/billing';
+  const card=document.createElement('div');card.id='api-error-card';card.className='err-card';
+  card.innerHTML='<div class="err-icon">⚡</div><div style="flex:1"><div class="err-title">Guthaben aufgebraucht</div><div class="err-msg">'+service+'-Guthaben erschöpft — bitte aufladen.</div><div class="err-actions"><a class="err-btn pri" href="'+url+'" target="_blank">Aufladen ↗</a><button class="err-btn sec" onclick="this.closest(\'.err-card\').remove()">Schließen</button></div></div>';
+  document.getElementById('screen-1').appendChild(card);
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 
 // ── Init journal badge ────────────────────────────
 (function(){
