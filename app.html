@@ -773,8 +773,14 @@ if(existingToken) {
     </div>
 
     <div class="drawer-section">
-      <div class="drawer-label">Ausgabe-Sprache</div>
-      <div style="font-size:12px;color:var(--txs);margin-bottom:8px">Egal in welcher Sprache die Eingabe ist — die Analyse erscheint in dieser Sprache</div>
+      <div class="drawer-label" style="display:flex;align-items:center;justify-content:space-between">
+        <span id="t-outlang">Ausgabe-Sprache</span>
+        <span style="font-size:12px;color:var(--txs)">
+          <span id="outputLangFlag">🇩🇪</span>
+          <span id="outputLangName" style="font-weight:500;color:var(--p)">DE</span>
+        </span>
+      </div>
+      <div style="font-size:12px;color:var(--txs);margin-bottom:8px">Sprache der GFK-Analyse — unabhängig von Eingabe und App-Sprache</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="lang-opts">
         <div class="lang-opt sel" onclick="pickLang(this,'de','Deutsch')"><span class="lang-flag">🇩🇪</span> Deutsch</div>
         <div class="lang-opt" onclick="pickLang(this,'en','English')"><span class="lang-flag">🇬🇧</span> English</div>
@@ -820,27 +826,44 @@ if(existingToken) {
   <!-- Header -->
   <div class="hdr">
     <div class="hdr-brand"><a href="https://resonanz.chat" style="color:var(--p);text-decoration:none">Resonanz</a></div>
-    <div class="hdr-right"
-      <div class="mpill" id="mpill" onclick="openSettings()" title="KI-Modell wechseln" style="cursor:pointer">
+    <div class="hdr-right" style="position:relative">
+
+      <!-- KI-Modell Schnellauswahl -->
+      <div class="mpill" id="mpill" onclick="toggleModelQuick(event)" title="KI-Modell wechseln" style="cursor:pointer">
         <div class="mdot" id="pdot"></div>
-        <span id="plbl">Claude Sonnet</span>
+        <span id="plbl">Claude</span>
       </div>
-      <div class="lang-pill" id="langPill" onclick="openSettings()" title="Ausgabe-Sprache ändern">
-        <span id="langFlag">🇩🇪</span>
-        <span id="langName">DE</span>
+      <div class="model-quick" id="modelQuick">
+        <div class="mq-opt sel" id="mq-claude" onclick="setModelQuick('claude','Claude','cloud')">
+          <div class="mq-dot"></div>Claude Sonnet
+        </div>
+        <div class="mq-opt" id="mq-gpt4" onclick="setModelQuick('gpt4','GPT-4o','cloud')">
+          <div class="mq-dot"></div>GPT-4o
+        </div>
+        <div class="mq-opt" id="mq-llama" onclick="setModelQuick('llama','Llama','local')">
+          <div class="mq-dot loc"></div>Llama (lokal)
+        </div>
       </div>
+
+      <!-- App-Sprache DE / EN (Oberfläche) -->
+      <div class="lang-pill" id="uiLangPill" onclick="toggleUiLang()" title="App language" style="cursor:pointer">
+        <span id="uiLangFlag">🇩🇪</span>
+        <span id="uiLangName">DE</span>
+      </div>
+
       <button class="ibtn" id="installBtn" onclick="showInstallGuide()" title="App installieren" style="display:none">📲</button>
       <button class="ibtn" onclick="openSettings()" title="Einstellungen">⚙</button>
     </div>
+  </div></div>
   </div>
 
   <!-- Step nav -->
   <div class="steps">
-    <button class="step act" id="step-1" onclick="goStep(1)"><div class="step-num">1</div>Eingabe</button>
-    <button class="step" id="step-2" onclick="goStep(2)"><div class="step-num">2</div>Analyse</button>
-    <button class="step" id="step-3" onclick="goStep(3)"><div class="step-num">3</div>Training</button>
-    <button class="step" id="step-4" onclick="goStep(4)"><div class="step-num">◎</div>Verlauf</button>
-    <button class="step" id="step-5" onclick="goStep(5)"><div class="step-num">◈</div>Karte</button>
+    <button class="step act" id="step-1" onclick="goStep(1)"><div class="step-num">1</div><span class="step-label">Eingabe</span></button>
+    <button class="step" id="step-2" onclick="goStep(2)"><div class="step-num">2</div><span class="step-label">Analyse</span></button>
+    <button class="step" id="step-3" onclick="goStep(3)"><div class="step-num">3</div><span class="step-label">Training</span></button>
+    <button class="step" id="step-4" onclick="goStep(4)"><div class="step-num">◎</div><span class="step-label">Verlauf</span></button>
+    <button class="step" id="step-5" onclick="goStep(5)"><div class="step-num">◈</div><span class="step-label">Karte</span></button>
   </div>
 
   <!-- Screens -->
@@ -1402,13 +1425,13 @@ function updateWhisperEngineUI(){}
 // ── Output language ───────────────────────────────
 function pickLang(el,code,name){
   S.outputLang=code;S.outputLangName=name;
-  // Derive flag from code
   const flags={de:'🇩🇪',en:'🇬🇧',es:'🇪🇸',fr:'🇫🇷',it:'🇮🇹',tr:'🇹🇷',ar:'🇸🇦',ru:'🇷🇺',zh:'🇨🇳',ja:'🇯🇵',pt:'🇧🇷',nl:'🇳🇱'};
   S.outputLangFlag=flags[code]||'🌐';
-  // Update pill
-  document.getElementById('langFlag').textContent=S.outputLangFlag;
-  document.getElementById('langName').textContent=code.toUpperCase();
-  // Update selector
+  // Update output-lang indicator in settings ONLY (not the header UI-lang pill)
+  const oFlag=document.getElementById('outputLangFlag');
+  const oName=document.getElementById('outputLangName');
+  if(oFlag)oFlag.textContent=S.outputLangFlag;
+  if(oName)oName.textContent=code.toUpperCase();
   document.querySelectorAll('#lang-opts .lang-opt').forEach(o=>o.classList.remove('sel'));
   el.classList.add('sel');
 }
@@ -2632,24 +2655,130 @@ const UI_LANG_KEY='resonanz_ui_lang';
 let uiLang=localStorage.getItem(UI_LANG_KEY)||'de';
 
 const T={
-  de:{analyse:'✦ GFK-Analyse starten',transcribe:'Jetzt transkribieren',placeholder:'Nachricht hier eingeben…',context:'Kontext (optional) — hilft der KI besser zu verstehen:'},
-  en:{analyse:'✦ Start NVC Analysis',transcribe:'Transcribe now',placeholder:'Enter message here…',context:'Context (optional) — helps the AI understand better:'}
+  de:{
+    // Steps
+    step1:'Eingabe',step2:'Analyse',step3:'Training',step4:'Verlauf',step5:'Karte',
+    // Buttons
+    analyse:'✦ GFK-Analyse starten',transcribe:'Jetzt transkribieren',
+    training:'Training starten',reset:'Zurücksetzen',
+    // Input section
+    placeholder:'Nachricht hier eingeben…',
+    context:'Kontext (optional) — hilft der KI besser zu verstehen:',
+    from:'Diese Nachricht kommt von:',
+    audioTitle:'Audionachrichten auswählen',
+    audioSub:'Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG, OPUS · beliebige Länge',
+    chatPlaceholder:'WhatsApp/Telegram Chat-Export hier einfügen…',
+    // Chips
+    partner:'Partner·in',mother:'Mutter',father:'Vater',
+    friend:'Freund·in',colleague:'Kolleg·in',other:'Andere',
+    // Settings
+    settings:'Einstellungen',model:'KI-Modell',outputLang:'Ausgabe-Sprache',
+    modules:'Ausgabe-Module',audio:'Audio-Transkription',audioLang:'Sprache der Aufnahme',
+    done:'Fertig',
+    // Tabs
+    tabText:'Text',tabAudio:'Audio',tabChat:'Chat',
+    // Misc
+    noMsg:'Bitte zuerst eine Nachricht eingeben.',
+    saving:'Keys gespeichert 🔒',
+    unlock:'Keys entsperren',pin:'4-stellige PIN eingeben',
+    pinBtn:'Zugang öffnen →',
+    pinBack:'← Zur Startseite',
+  },
+  en:{
+    step1:'Input',step2:'Analysis',step3:'Training',step4:'Journal',step5:'Map',
+    analyse:'✦ Start NVC Analysis',transcribe:'Transcribe now',
+    training:'Start training',reset:'Reset',
+    placeholder:'Enter message here…',
+    context:'Context (optional) — helps the AI understand better:',
+    from:'This message is from:',
+    audioTitle:'Select voice messages',
+    audioSub:'Multiple at once · MP3, M4A, WAV, OGG, OPUS · any length',
+    chatPlaceholder:'Paste WhatsApp/Telegram chat export here…',
+    partner:'Partner',mother:'Mother',father:'Father',
+    friend:'Friend',colleague:'Colleague',other:'Other',
+    settings:'Settings',model:'AI Model',outputLang:'Output Language',
+    modules:'Output Modules',audio:'Audio Transcription',audioLang:'Recording language',
+    done:'Done',
+    tabText:'Text',tabAudio:'Audio',tabChat:'Chat',
+    noMsg:'Please enter a message first.',
+    saving:'Keys saved 🔒',
+    unlock:'Unlock keys',pin:'Enter 4-digit PIN',
+    pinBtn:'Open →',
+    pinBack:'← Back to home',
+  }
 };
 
 function applyUiLang(lang){
   uiLang=lang;
   localStorage.setItem(UI_LANG_KEY,lang);
   const t=T[lang]||T.de;
-  document.getElementById('uiLangFlag').textContent=lang==='en'?'🇬🇧':'🇩🇪';
-  document.getElementById('uiLangName').textContent=lang.toUpperCase();
+  const isEn=lang==='en';
+
+  // Header pill
+  const uf=document.getElementById('uiLangFlag');
+  const un=document.getElementById('uiLangName');
+  if(uf)uf.textContent=isEn?'🇬🇧':'🇩🇪';
+  if(un)un.textContent=lang.toUpperCase();
+
+  // Steps
+  ['1','2','3','4','5'].forEach(n=>{
+    const lbl=document.querySelector('#step-'+n+' .step-label');
+    if(lbl)lbl.textContent=t['step'+n];
+  });
+
+  // Buttons
   const ab=document.getElementById('analyseBtn');
-  if(ab)ab.innerHTML=t.analyse;
+  if(ab){ab.innerHTML=t.analyse;}
   const tb=document.getElementById('transcribeBtn');
   if(tb)tb.textContent=t.transcribe;
+  const trainBtn=document.getElementById('trainBtn');
+  if(trainBtn)trainBtn.textContent=t.training;
+
+  // Input placeholders
   const mi=document.getElementById('msgIn');
   if(mi)mi.placeholder=t.placeholder;
   const cx=document.getElementById('ctxIn');
   if(cx)cx.placeholder=t.context;
+  const ci=document.getElementById('chatIn');
+  if(ci)ci.placeholder=t.chatPlaceholder;
+
+  // Tabs
+  const tt=document.querySelector('[onclick="switchTab('text')"]');
+  const ta=document.querySelector('[onclick="switchTab('audio')"]');
+  const tc=document.querySelector('[onclick="switchTab('chat')"]');
+  if(tt)tt.textContent=t.tabText;
+  if(ta)ta.textContent=t.tabAudio;
+  if(tc)tc.textContent=t.tabChat;
+
+  // Source chips
+  const chipMap={partner:t.partner,mother:t.mother,father:t.father,friend:t.friend,colleague:t.colleague,other:t.other};
+  document.querySelectorAll('.chip[onclick]').forEach(c=>{
+    const m=c.getAttribute('onclick').match(/'(\w+)'\)/);
+    if(m&&chipMap[m[1]])c.textContent=chipMap[m[1]];
+  });
+
+  // Audio drop zone
+  const dt=document.querySelector('.drop-title');
+  if(dt)dt.textContent=t.audioTitle;
+  const ds=document.querySelector('.drop-sub');
+  if(ds)ds.textContent=t.audioSub;
+
+  // Settings drawer labels
+  const sl=document.getElementById('t-outlang');
+  if(sl)sl.textContent=t.outputLang;
+  const settTitle=document.querySelector('.drawer-title');
+  if(settTitle)settTitle.textContent=t.settings;
+
+  // Gate
+  const gSub=document.querySelector('.gate-sub');
+  if(gSub)gSub.innerHTML=isEn?'Enter your access code<br>to open the app.':t.pinBack?'Gib deinen Zugangscode ein<br>um die App zu öffnen.':'';
+  const gBtn=document.getElementById('gate-btn');
+  if(gBtn)gBtn.textContent=t.pinBtn;
+  const gBack=document.querySelector('.gate-back');
+  if(gBack)gBack.textContent=t.pinBack;
+
+  // html lang attr
+  document.documentElement.lang=lang;
 }
 
 function toggleUiLang(){applyUiLang(uiLang==='de'?'en':'de');}
