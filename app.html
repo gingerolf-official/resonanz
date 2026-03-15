@@ -384,7 +384,8 @@ audio{width:100%;height:28px;margin-top:6px}
 .istep-n{width:20px;height:20px;border-radius:50%;background:var(--p);color:white;font-size:10px;font-weight:500;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 
 /* ─── INSTALL BANNER ─── */
-.install-bar{display:none;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;background:var(--p);color:white;font-size:13px}
+@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}
+.install-bar{display:none;animation:slideDown .3s ease;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;background:var(--p);color:white;font-size:13px}
 .install-bar.show{display:flex}
 .install-bar-text{display:flex;align-items:center;gap:8px}
 .install-bar-acts{display:flex;gap:6px;flex-shrink:0}
@@ -475,59 +476,6 @@ audio{width:100%;height:28px;margin-top:6px}
 </style>
 </head>
 <body>
-
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
-<style>
-#access-gate{position:fixed;inset:0;background:#F2EDE4;z-index:9999;display:none;align-items:center;justify-content:center;padding:24px}
-.gate-box{background:#FDFAF6;border:.5px solid rgba(42,71,64,.12);border-radius:24px;padding:40px 32px;width:100%;max-width:320px;text-align:center}
-.gate-logo{font-size:1.4rem;color:#2A4740;margin-bottom:8px}
-.gate-sub{font-size:13px;color:#8A9C94;margin-bottom:28px;line-height:1.6}
-.gate-input{width:100%;padding:13px 16px;border:.5px solid rgba(42,71,64,.2);border-radius:12px;font-size:15px;text-align:center;letter-spacing:.15em;background:#F2EDE4;color:#0E1A14;font-family:inherit;outline:none;margin-bottom:10px;transition:border-color .2s}
-.gate-input:focus{border-color:#2A4740}
-.gate-btn{width:100%;padding:13px;background:#2A4740;color:white;border:none;border-radius:12px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;transition:all .2s;margin-bottom:8px}
-.gate-btn:hover{background:#38594F}
-.gate-err{font-size:12px;color:#B55A2C;min-height:18px;margin-bottom:8px}
-.gate-back{font-size:12px;color:#8A9C94;text-decoration:none;display:block;margin-top:12px}
-</style>
-<div id="access-gate">
-  <div class="gate-box">
-    <div class="gate-logo">✦ Resonanz</div>
-    <p class="gate-sub">Gib deinen Zugangscode ein<br>um die App zu öffnen.</p>
-    <input class="gate-input" id="gate-input" type="password" placeholder="XXXX-XXXX"
-      maxlength="20" autocomplete="off" onkeydown="if(event.key==='Enter')checkCode()">
-    <div class="gate-err" id="gate-err"></div>
-    <button class="gate-btn" id="gate-btn" onclick="checkCode()">Zugang öffnen →</button>
-    <a href="https://resonanz.chat" class="gate-back">← Zur Startseite</a>
-  </div>
-</div>
-<script>
-const GATE_KEY='resonanz_token_v1';
-const GATE_BACKEND='https://resonanz-backend.vercel.app';
-async function checkCode(){
-  const input=document.getElementById('gate-input');
-  const btn=document.getElementById('gate-btn');
-  const err=document.getElementById('gate-err');
-  const val=input.value.trim();
-  if(!val){err.textContent='Bitte Code eingeben';return;}
-  btn.textContent='Prüfe…';btn.disabled=true;err.textContent='';
-  try{
-    const r=await fetch(GATE_BACKEND+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:val})});
-    const d=await r.json();
-    if(r.ok&&d.token){
-      localStorage.setItem(GATE_KEY,d.token);
-      document.getElementById('access-gate').style.display='none';
-    } else {
-      err.textContent=d.error||'Ungültiger Code';
-      input.value='';input.focus();
-    }
-  }catch(e){err.textContent='Verbindungsfehler: '+(e.message||'unbekannt');}
-  btn.textContent='Zugang öffnen →';btn.disabled=false;
-}
-(function(){
-  const t=localStorage.getItem(GATE_KEY);
-  if(!t){document.getElementById('access-gate').style.display='flex';}
-})();
-</script>
 
 <!-- Word popup -->
 <div class="wpop" id="wpop">
@@ -1188,13 +1136,13 @@ function setModel(id,lbl,type){
 
 // ── Settings drawer ───────────────────────────────
 function openSettings(){document.getElementById('settingsOv').classList.add('open')}
-function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
 function showInstallGuide(){
-  var el=document.getElementById('installGuideOv');
+  const el=document.getElementById('installGuideOv');
   if(el)el.classList.add('open');
   else if(deferredInstall)doInstall();
   else showToast('Im Browser-Menü: Zum Startbildschirm hinzufügen');
 }
+function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
 
 // ── Key persistence (XOR + PIN, localStorage) ────
 const KEY_STORE = 'resonanz_keys_v1';
@@ -1323,7 +1271,6 @@ function tryLoadPin(pin) {
     document.getElementById('pin-input').value = '';
   }
 }
-
 
 
 function updateKeyStatus(which, val) {
@@ -1546,6 +1493,7 @@ async function transcribeAll(){
   if(tb){tb.disabled=false;tb.classList.remove('ld');}
 }
 
+
 async function trOpenAI(file,lang){
   let sendFile=file;
   if(file.name.toLowerCase().endsWith('.opus')){
@@ -1567,7 +1515,6 @@ async function trOpenAI(file,lang){
   }));
   return{text:d.text,words};
 }
-
 function simTR(){
   const base=[
     {word:'Ich',start:.1,end:.4,prob:.98},{word:'wollte',start:.4,end:.75,prob:.95},{word:'dir',start:.8,end:.95,prob:.97},
@@ -2607,15 +2554,6 @@ if('serviceWorker' in navigator){
     promptPinAndLoad();
   }
 })();
-
-function showUsageError(service){
-  const old=document.getElementById('api-error-card');if(old)old.remove();
-  const url=service==='Anthropic'?'https://console.anthropic.com/settings/billing':'https://platform.openai.com/settings/billing';
-  const card=document.createElement('div');card.id='api-error-card';card.className='err-card';
-  card.innerHTML='<div class="err-icon">⚡</div><div style="flex:1"><div class="err-title">Guthaben aufgebraucht</div><div class="err-msg">'+service+'-Guthaben erschöpft — bitte aufladen.</div><div class="err-actions"><a class="err-btn pri" href="'+url+'" target="_blank">Aufladen ↗</a><button class="err-btn sec" onclick="this.closest(\'.err-card\').remove()">Schließen</button></div></div>';
-  document.getElementById('screen-1').appendChild(card);
-  card.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
 
 // ── Init journal badge ────────────────────────────
 (function(){
