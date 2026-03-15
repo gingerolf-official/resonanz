@@ -676,9 +676,19 @@ if(existingToken) {
           <div style="flex:1"><div class="mot-n">Claude Sonnet</div><div class="mot-s">Anthropic · beste Empathie</div></div>
           <span class="mbadge mba">API</span>
         </div>
+        <div class="mopt" onclick="pickModel(this,'haiku','Claude Haiku','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
+          <div class="mot-d dc"></div>
+          <div style="flex:1"><div class="mot-n">Claude Haiku</div><div class="mot-s">Anthropic · schnell · günstig</div></div>
+          <span class="mbadge mba">API</span>
+        </div>
         <div class="mopt" onclick="pickModel(this,'gpt4','GPT-4o','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
           <div class="mot-d dc"></div>
           <div style="flex:1"><div class="mot-n">GPT-4o</div><div class="mot-s">OpenAI · sehr präzise</div></div>
+          <span class="mbadge mba">API</span>
+        </div>
+        <div class="mopt" onclick="pickModel(this,'mini','GPT-4o mini','cloud')" style="border:.5px solid var(--bd);border-radius:var(--r)">
+          <div class="mot-d dc"></div>
+          <div style="flex:1"><div class="mot-n">GPT-4o mini</div><div class="mot-s">OpenAI · günstig · schnell</div></div>
           <span class="mbadge mba">API</span>
         </div>
         <div class="mopt" onclick="pickModel(this,'llama','Llama 3.2','local')" style="border:.5px solid var(--bd);border-radius:var(--r)">
@@ -841,10 +851,16 @@ if(existingToken) {
       </div>
       <div class="model-quick" id="modelQuick">
         <div class="mq-opt sel" id="mq-claude" onclick="setModelQuick('claude','Claude Sonnet','cloud')">
-          <div class="mq-dot"></div>Claude Sonnet
+          <div class="mq-dot"></div>Claude Sonnet <span style="font-size:10px;opacity:.5">smart</span>
+        </div>
+        <div class="mq-opt" id="mq-haiku" onclick="setModelQuick('haiku','Claude Haiku','cloud')">
+          <div class="mq-dot"></div>Claude Haiku <span style="font-size:10px;opacity:.5">schnell</span>
         </div>
         <div class="mq-opt" id="mq-gpt4" onclick="setModelQuick('gpt4','GPT-4o','cloud')">
-          <div class="mq-dot"></div>GPT-4o
+          <div class="mq-dot"></div>GPT-4o <span style="font-size:10px;opacity:.5">smart</span>
+        </div>
+        <div class="mq-opt" id="mq-mini" onclick="setModelQuick('mini','GPT-4o mini','cloud')">
+          <div class="mq-dot"></div>GPT-4o mini <span style="font-size:10px;opacity:.5">günstig</span>
         </div>
         <div class="mq-opt" id="mq-llama" onclick="setModelQuick('llama','Llama 3.2','local')">
           <div class="mq-dot loc"></div>Llama 3.2
@@ -1236,13 +1252,17 @@ function setModel(id,lbl,type){
   S.model=id;S.mtype=type;
   document.getElementById('plbl').textContent=lbl;
   const d=document.getElementById('pdot');d.className='mdot'+(type==='local'?' loc':'');
-  // Show/hide key fields based on model
+  // Show/hide key fields
   const kc=document.getElementById('key-claude');
   const ko=document.getElementById('key-openai');
   const kl=document.getElementById('key-ollama');
-  if(kc)kc.style.display=id==='claude'?'':'none';
-  if(ko)ko.style.display=id==='gpt4'?'':'none';
+  if(kc)kc.style.display=(id==='claude'||id==='haiku')?'':'none';
+  if(ko)ko.style.display=(id==='gpt4'||id==='mini')?'':'none';
   if(kl)kl.style.display=type==='local'?'':'none';
+  // Always sync header quick dropdown
+  document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
+  const mq=document.getElementById('mq-'+id);
+  if(mq)mq.classList.add('sel');
 }
 
 // ── Settings drawer ───────────────────────────────
@@ -1324,8 +1344,12 @@ function loadKeys(pin) {
       if (el && val) { el.textContent='✓ Geladen'; el.style.color='var(--p)'; }
     });
     showKeysSavedState(true);
+    // Sync header quick dropdown with loaded model
+    document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
+    const mqLoaded=document.getElementById('mq-'+data.model);
+    if(mqLoaded)mqLoaded.classList.add('sel');
     return true;
-  } catch { return false; }
+  } catch(e) { console.error('loadKeys error:',e); return false; }
 }
 
 function clearSavedKeys() {
@@ -1767,13 +1791,15 @@ async function callAPI(prompt){
   }
 
   // Cloud-Modelle → über Resonanz-Backend (kein Key im Browser)
+  // Map model IDs to API names
+  const modelMap={claude:'claude',haiku:'haiku',gpt4:'gpt4',mini:'mini'};
   const r=await fetch(BACKEND+'/api/analyse',{
     method:'POST',
     headers:{
       'Content-Type':'application/json',
       'x-resonanz-token': sessionStorage.getItem('resonanz_token_v1')||''
     },
-    body:JSON.stringify({prompt,model:S.model})
+    body:JSON.stringify({prompt,model:modelMap[S.model]||S.model})
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
@@ -2649,7 +2675,22 @@ function showShareBanner(type,count){
   b.innerHTML=`<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:15px;margin-left:4px">✕</button>`;
   setTimeout(()=>{if(b&&b.parentElement)b.remove();},5000);
 }
-setTimeout(applyPendingShare,400);
+setTimeout(()=>{
+  // Only apply share if gate is dismissed
+  const gate=document.getElementById('access-gate');
+  if(!gate||gate.style.display==='none'){
+    applyPendingShare();
+  } else {
+    // Wait for gate to be dismissed, then apply
+    const observer=new MutationObserver(()=>{
+      if(gate.style.display==='none'){
+        observer.disconnect();
+        applyPendingShare();
+      }
+    });
+    observer.observe(gate,{attributes:true,attributeFilter:['style']});
+  }
+},400);
 // Also re-check when SW signals completion
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message',e=>{
