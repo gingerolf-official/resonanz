@@ -515,7 +515,7 @@ audio{width:100%;height:28px;margin-top:6px}
 </div>
 
 <script>
-// ── Secure gate: code is verified on server, never in browser ──
+// ── Secure gate: code verified on server, token stored locally ──
 const GATE_KEY = 'resonanz_token_v1';
 const GATE_BACKEND = 'https://resonanz-backend.vercel.app';
 
@@ -538,15 +538,15 @@ async function checkCode(){
     });
     const d = await r.json();
     if (r.ok && d.token) {
-      sessionStorage.setItem(GATE_KEY, d.token);
-      document.getElementById('access-gate').style.display = 'none';
+      // localStorage = persists across app restarts and share-button opens
+      localStorage.setItem(GATE_KEY, d.token);
+      dismissGate();
     } else {
       err.textContent = d.error || 'Ungültiger Code';
       input.value = '';
       input.focus();
     }
   } catch(e) {
-    // Show real error for debugging
     err.textContent = 'Verbindungsfehler: ' + (e.message || 'unbekannt');
     console.error('Gate error:', e);
   }
@@ -554,10 +554,15 @@ async function checkCode(){
   btn.disabled = false;
 }
 
-// Auto-unlock if token exists in this session
-const existingToken = sessionStorage.getItem(GATE_KEY);
+function dismissGate(){
+  const gate = document.getElementById('access-gate');
+  if(gate) gate.style.display = 'none';
+}
+
+// Auto-unlock if token stored locally (persists across sessions)
+const existingToken = localStorage.getItem(GATE_KEY);
 if(existingToken) {
-  document.getElementById('access-gate').style.display = 'none';
+  dismissGate();
 }
 </script>
 
@@ -744,7 +749,7 @@ if(existingToken) {
       <div class="drawer-label">Audio-Transkription</div>
       <div class="drawer-field">
         <div class="field-label">Sprache der Sprachnachrichten</div>
-        <select class="fi" id="wlang">
+        <select class="fi" id="wlang" onchange="saveSettings()">
           <option value="de">Deutsch</option>
           <option value="en">Englisch</option>
           <option value="tr">Türkisch</option>
@@ -989,7 +994,11 @@ if(existingToken) {
         </div>
       </div>
 
-      <!-- Action -->
+      <!-- Detail level + Action -->
+      <div style="display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px">
+        <div class="detail-opt sel" data-val="simple" onclick="setGfkDetail(this,'simple')" style="font-size:12px;padding:5px 14px;border-radius:16px;cursor:pointer;border:.5px solid var(--bd);background:var(--p);color:white;transition:all .15s">Einfach</div>
+        <div class="detail-opt" data-val="detailed" onclick="setGfkDetail(this,'detailed')" style="font-size:12px;padding:5px 14px;border-radius:16px;cursor:pointer;border:.5px solid var(--bd);background:transparent;color:var(--txm);transition:all .15s">Detailliert</div>
+      </div>
       <div class="next-row">
         <button class="btn btn-primary" id="analyseBtn" onclick="runAnalysis()">
           <span class="bi">✦</span><div class="spin"></div>
@@ -1229,24 +1238,106 @@ if(existingToken) {
 const BACKEND = 'https://resonanz-backend.vercel.app'; // ← deine URL nach dem Deploy
 
 const S={
-  model:'claude',mtype:'cloud',tab:'text',src:'partner',outputLang:'de',outputLangName:'Deutsch',outputLangFlag:'🇩🇪',
+  model:'claude',mtype:'cloud',tab:'text',src:'partner',gfkDetail:'simple',outputLang:'de',outputLangName:'Deutsch',outputLangFlag:'🇩🇪',
   togs:{self:true,resp:true,sum:true,trig:true,train:true},
   afiles:[],transcripts:[],popWord:null,
   lastGFK:null,curStep:1
 };
 
+// ── Settings Persistence ─────────────────────────────────────
+const SETTINGS_KEY = 'resonanz_settings_v1';
+
+function saveSettings(){
+  try{
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      model: S.model,
+      mtype: S.mtype,
+      modelLabel: document.getElementById('plbl')?.textContent || 'Claude Sonnet',
+      outputLang: S.outputLang,
+      outputLangName: S.outputLangName,
+      outputLangFlag: S.outputLangFlag,
+      togs: S.togs,
+      src: S.src,
+      uiLang: localStorage.getItem('resonanz_ui_lang')||'de',
+      wlang: document.getElementById('wlang')?.value || 'de',
+      gfkDetail: S.gfkDetail||'simple',
+    }));
+  }catch(e){}
+}
+
+function loadSettings(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if(!raw) return;
+    const p = JSON.parse(raw);
+
+    // Model
+    if(p.model){
+      setModel(p.model, p.modelLabel||p.model, p.mtype||'cloud');
+      // Sync settings drawer
+      document.querySelectorAll('#model-opts .mopt').forEach(o=>{
+        o.classList.remove('sel'); o.style.background='';
+        if((o.getAttribute('onclick')||'').includes("'"+p.model+"'"))
+          {o.classList.add('sel'); o.style.background='rgba(42,71,64,.06)';}
+      });
+    }
+
+    // Output language
+    if(p.outputLang){
+      S.outputLang = p.outputLang;
+      S.outputLangName = p.outputLangName||p.outputLang;
+      S.outputLangFlag = p.outputLangFlag||'🇩🇪';
+      // Sync lang-opts
+      document.querySelectorAll('#lang-opts .lang-opt').forEach(o=>{
+        o.classList.remove('sel');
+        if((o.getAttribute('onclick')||'').includes("'"+p.outputLang+"'"))
+          o.classList.add('sel');
+      });
+      const oFlag = document.getElementById('outputLangFlag');
+      const oName = document.getElementById('outputLangName');
+      if(oFlag) oFlag.textContent = p.outputLangFlag||'🇩🇪';
+      if(oName) oName.textContent = p.outputLang.toUpperCase();
+    }
+
+    // Toggles
+    if(p.togs){
+      S.togs = {...S.togs, ...p.togs};
+      Object.entries(p.togs).forEach(([k,v])=>{
+        const sw = document.getElementById('tsw-'+k);
+        if(sw){ sw.classList.toggle('on', v); }
+      });
+    }
+
+    // Audio language
+    if(p.wlang){
+      const wl = document.getElementById('wlang');
+      if(wl) wl.value = p.wlang;
+    }
+
+    // GFK detail level
+    if(p.gfkDetail){
+      S.gfkDetail = p.gfkDetail;
+      document.querySelectorAll('.detail-opt').forEach(o=>{
+        o.classList.toggle('sel', o.dataset.val === p.gfkDetail);
+      });
+    }
+
+  }catch(e){ console.warn('loadSettings error:', e); }
+}
+
+
+
 // ── Model selection (settings drawer only) ────────
 function pickModel(el,id,lbl,type){
   setModel(id,lbl,type);
-  // Sync settings drawer
   document.querySelectorAll('#model-opts .mopt').forEach(o=>{
     o.classList.remove('sel');o.style.background='';
   });
   el.classList.add('sel');el.style.background='rgba(42,71,64,.06)';
-  // Sync header quick dropdown
   document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
   const mq=document.getElementById('mq-'+id);
   if(mq)mq.classList.add('sel');
+  saveSettings();
 }
 function setModel(id,lbl,type){
   S.model=id;S.mtype=type;
@@ -1459,7 +1550,7 @@ function updatePillStatus() {
 }
 
 // ── Toggle switches ───────────────────────────────
-function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on')}
+function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on');saveSettings();}
 
 function updateWhisperEngineUI(){}
 
@@ -1475,6 +1566,7 @@ function pickLang(el,code,name){
   if(oName)oName.textContent=code.toUpperCase();
   document.querySelectorAll('#lang-opts .lang-opt').forEach(o=>o.classList.remove('sel'));
   el.classList.add('sel');
+  saveSettings();
 }
 
 // ── Steps ─────────────────────────────────────────
@@ -1730,23 +1822,70 @@ function getText(){
 }
 
 // ── Prompts ───────────────────────────────────────
-function buildGFKPrompt(msg,ctx){
+
+function setGfkDetail(el, val){
+  S.gfkDetail = val;
+  document.querySelectorAll('.detail-opt').forEach(o=>{
+    const isActive = o.dataset.val === val;
+    o.classList.toggle('sel', isActive);
+    o.style.background = isActive ? 'var(--p)' : '';
+    o.style.color = isActive ? 'white' : '';
+    o.style.borderColor = isActive ? 'var(--p)' : '';
+  });
+  saveSettings();
+}
+
+function buildGFKPrompt(msg, ctx){
   const srcMap={partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'};
   const lang=S.outputLang||'de';
-  const langInstr=lang==='de'?'Antworte auf Deutsch.'
-    :lang==='en'?'Respond in English.'
-    :lang==='es'?'Responde en español.'
-    :lang==='fr'?'Réponds en français.'
-    :lang==='it'?'Rispondi in italiano.'
-    :lang==='tr'?'Türkçe yanıt ver.'
-    :lang==='ar'?'أجب باللغة العربية.'
-    :lang==='ru'?'Отвечай на русском языке.'
-    :lang==='zh'?'用中文回答。'
-    :lang==='ja'?'日本語で回答してください。'
-    :lang==='pt'?'Responda em português.'
-    :lang==='nl'?'Antwoord in het Nederlands.'
-    :`Respond in ${S.outputLangName||lang}.`;
-  return`You are a NVC (Nonviolent Communication) coach. Analyze the message from ${srcMap[S.src]||'a person'}. ${langInstr} Reply ONLY with valid JSON — no markdown, no explanation outside JSON.\n\n${ctx?'Context: '+ctx+'\n':''}Message: "${msg}"\n\n{"self":{"observation":"factual observation without judgment","feeling":"concrete NVC feeling","need":"deep universal need","request":"request to myself"},"response":"empathetic NVC response 2-4 sentences","summary":"neutral summary 2-3 sentences","tags":["tag1","tag2"],"triggers":[{"phrase":"triggering phrase","explanation":"which old pattern does this activate?"}]}`;
+  const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ar:'أجب باللغة العربية.',ru:'Отвечай на русском языке.',zh:'用中文回答。',ja:'日本語で回答してください。',pt:'Responda em português.',nl:'Antwoord in het Nederlands.'};
+  const langInstr = langMap[lang] || 'Respond in '+lang+'.';
+  const src = srcMap[S.src]||'einer anderen Person';
+  const isDetailed = S.gfkDetail === 'detailed';
+  const ctxPart = ctx ? '\nContext/Background: '+ctx : '';
+  const msgPart = '\nMessage from '+src+': "'+msg+'"';
+
+  if(isDetailed){
+    return `You are a deeply empathetic NVC (Nonviolent Communication) coach with expertise in trauma-informed communication. ${langInstr} Analyze this message thoroughly.${ctxPart}${msgPart}
+
+Reply ONLY with valid JSON, no markdown.
+
+{
+  "self": {
+    "observation": "Precise factual observation — what exactly was said/done, without interpretation",
+    "feeling": "The most likely genuine NVC feeling behind this message (not thoughts or judgments)",
+    "need": "The deep universal human need driving this feeling",
+    "need_context": "Brief explanation of why this need matters in this relationship dynamic",
+    "request": "A concrete, doable request I could make of myself right now",
+    "old_pattern": "What old relational pattern or wound might this be activating in me?"
+  },
+  "response": "Empathetic NVC response to send (3-5 sentences, warm and connecting, acknowledging their feeling and need without losing yourself)",
+  "response_tip": "One specific tip for delivery: tone, timing, or context",
+  "summary": "Neutral 3-4 sentence summary of the dynamic at play",
+  "communication_pattern": "Name the communication pattern visible in this message (e.g. criticism as need expression, distancing as fear of intimacy, etc.)",
+  "relationship_insight": "One deeper insight about this relationship dynamic worth reflecting on",
+  "tags": ["tag1", "tag2", "tag3"],
+  "triggers": [{"phrase": "exact triggering phrase", "explanation": "which old wound or pattern does this activate?", "somatic": "possible body sensation this might cause"}],
+  "growth_impulse": "One concrete thing I could practice or reflect on to grow from this interaction"
+}`;
+  } else {
+    return `You are a warm NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
+
+Reply ONLY with valid JSON, no markdown.
+
+{
+  "self": {
+    "observation": "What was actually said/done (factual, no judgment)",
+    "feeling": "The feeling this message likely expresses",
+    "need": "The underlying universal human need",
+    "request": "A simple request I could make of myself"
+  },
+  "response": "A warm, empathetic NVC response to send (2-3 sentences)",
+  "summary": "Neutral summary in 2-3 clear sentences",
+  "tags": ["tag1", "tag2"],
+  "triggers": [{"phrase": "triggering phrase", "explanation": "why this triggers a reaction"}]
+}`;
+  }
 }
 function buildTrainPrompt(origMsg,gfk,userResp,ctx){
   const lang=S.outputLang||'de';
@@ -1797,7 +1936,7 @@ async function callAPI(prompt){
     method:'POST',
     headers:{
       'Content-Type':'application/json',
-      'x-resonanz-token': sessionStorage.getItem('resonanz_token_v1')||''
+      'x-resonanz-token': localStorage.getItem('resonanz_token_v1')||''
     },
     body:JSON.stringify({prompt,model:modelMap[S.model]||S.model})
   });
@@ -1955,6 +2094,16 @@ function renderAnalysis(r,msg){
   }else document.getElementById('rc-trig').style.display='none';
 
   document.getElementById('rc-train-hint').style.display=t.train?'':'none';
+
+  // Render extra detailed fields if present
+  const commPat=document.getElementById('gCommPattern');
+  const relInsight=document.getElementById('gRelInsight');
+  const growthImp=document.getElementById('gGrowthImpulse');
+  if(commPat)commPat.closest('.res-card')?commPat.closest('.res-card').style.display=(r.communication_pattern?'':'none'):null;
+  if(commPat&&r.communication_pattern)commPat.textContent=r.communication_pattern;
+  if(relInsight&&r.relationship_insight)relInsight.textContent=r.relationship_insight;
+  if(growthImp&&r.growth_impulse)growthImp.textContent=r.growth_impulse;
+  if(r.response_tip){const tip=document.getElementById('gRespTip');if(tip){tip.textContent=r.response_tip;tip.style.display='';}}
 
   // Auto-save to journal
   saveEntry(r, msg);
@@ -2893,6 +3042,9 @@ function showUsageError(service){
 }
 
 (function(){applyUiLang(uiLang);})();
+
+// ── Init: load persisted settings ───────────────
+(function(){ loadSettings(); })();
 
 // ── Init: load saved keys ────────────────────────
 (function(){
