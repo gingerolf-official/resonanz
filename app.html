@@ -517,6 +517,7 @@ audio{width:100%;height:28px;margin-top:6px}
 <script>
 // ── Secure gate: code is verified on server, never in browser ──
 const GATE_KEY = 'resonanz_token_v1';
+const GATE_BACKEND = 'https://resonanz-backend.vercel.app';
 
 async function checkCode(){
   const input = document.getElementById('gate-input');
@@ -530,7 +531,7 @@ async function checkCode(){
   err.textContent = '';
 
   try {
-    const r = await fetch(BACKEND + '/api/auth', {
+    const r = await fetch(GATE_BACKEND + '/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: val })
