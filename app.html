@@ -121,7 +121,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--tx);min-h
 .ibtn:hover{background:var(--sur2);color:var(--p)}
 
 /* ─── STEP NAV ─── */
-.steps{display:flex;align-items:center;gap:0;background:var(--sur);border-bottom:.5px solid var(--bd);padding:0 20px;overflow-x:auto;scrollbar-width:none}
+.steps{display:flex;align-items:center;gap:0;background:var(--sur);border-bottom:.5px solid var(--bd);padding:0 20px;overflow-x:auto;scrollbar-width:none;position:sticky;top:var(--hdr-h,56px);z-index:50}
 .steps::-webkit-scrollbar{display:none}
 .step{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;color:var(--txs);font-size:13px;transition:all .15s;flex-shrink:0;background:none;border-left:none;border-right:none;border-top:none;font-family:'DM Sans',sans-serif}
 .step.act{color:var(--p);border-bottom-color:var(--p)}
@@ -817,8 +817,11 @@ if(existingToken) {
   <!-- Install banner (auto, Chrome only) -->
   <div class="install-bar" id="installBar">
     <div class="install-bar-text">
-      <span style="font-size:20px">📲</span>
-      <span><strong>Resonanz installieren</strong> — für WhatsApp-Teilen-Integration</span>
+      <div class="install-bar-icon">📲</div>
+      <div class="install-bar-copy">
+        <div class="install-bar-title">Resonanz installieren</div>
+        <div class="install-bar-sub">Dann erscheint die App im Teilen-Menü von WhatsApp & Co.</div>
+      </div>
     </div>
     <div class="install-bar-acts">
       <button class="install-btn install-btn-yes" onclick="doInstall()">Installieren</button>
@@ -837,14 +840,17 @@ if(existingToken) {
         <span id="plbl">Claude</span>
       </div>
       <div class="model-quick" id="modelQuick">
-        <div class="mq-opt sel" id="mq-claude" onclick="setModelQuick('claude','Claude','cloud')">
+        <div class="mq-opt sel" id="mq-claude" onclick="setModelQuick('claude','Claude Sonnet','cloud')">
           <div class="mq-dot"></div>Claude Sonnet
         </div>
         <div class="mq-opt" id="mq-gpt4" onclick="setModelQuick('gpt4','GPT-4o','cloud')">
           <div class="mq-dot"></div>GPT-4o
         </div>
-        <div class="mq-opt" id="mq-llama" onclick="setModelQuick('llama','Llama','local')">
-          <div class="mq-dot loc"></div>Llama (lokal)
+        <div class="mq-opt" id="mq-llama" onclick="setModelQuick('llama','Llama 3.2','local')">
+          <div class="mq-dot loc"></div>Llama 3.2
+        </div>
+        <div class="mq-opt" id="mq-mistral" onclick="setModelQuick('mistral','Mistral 7B','local')">
+          <div class="mq-dot loc"></div>Mistral 7B
         </div>
       </div>
 
@@ -854,7 +860,7 @@ if(existingToken) {
         <span id="uiLangName">DE</span>
       </div>
 
-      <button class="ibtn" id="installBtn" onclick="showInstallGuide()" title="App installieren" style="display:none">📲</button>
+      <button class="ibtn" id="installBtn" onclick="showInstallGuide()" title="App installieren">📲</button>
       <button class="ibtn" onclick="openSettings()" title="Einstellungen">⚙</button>
     </div>
   </div>
@@ -1216,18 +1222,27 @@ const S={
 // ── Model selection (settings drawer only) ────────
 function pickModel(el,id,lbl,type){
   setModel(id,lbl,type);
+  // Sync settings drawer
   document.querySelectorAll('#model-opts .mopt').forEach(o=>{
     o.classList.remove('sel');o.style.background='';
   });
   el.classList.add('sel');el.style.background='rgba(42,71,64,.06)';
+  // Sync header quick dropdown
+  document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
+  const mq=document.getElementById('mq-'+id);
+  if(mq)mq.classList.add('sel');
 }
 function setModel(id,lbl,type){
   S.model=id;S.mtype=type;
   document.getElementById('plbl').textContent=lbl;
   const d=document.getElementById('pdot');d.className='mdot'+(type==='local'?' loc':'');
-  document.getElementById('key-claude').style.display=id==='claude'?'':'none';
-  document.getElementById('key-openai').style.display=id==='gpt4'?'':'none';
-  document.getElementById('key-ollama').style.display=type==='local'?'':'none';
+  // Show/hide key fields based on model
+  const kc=document.getElementById('key-claude');
+  const ko=document.getElementById('key-openai');
+  const kl=document.getElementById('key-ollama');
+  if(kc)kc.style.display=id==='claude'?'':'none';
+  if(ko)ko.style.display=id==='gpt4'?'':'none';
+  if(kl)kl.style.display=type==='local'?'':'none';
 }
 
 // ── Settings drawer ───────────────────────────────
@@ -2565,7 +2580,7 @@ window.addEventListener('resize',()=>{if(S.curStep===5)resizeMap();});
 let deferredInstall=null;
 
 // Version bump — clears old dismissed flag so banner shows again
-const PWA_VERSION='v3-external';
+const PWA_VERSION='v4-resonanz';
 if(localStorage.getItem('pwa_version')!==PWA_VERSION){
   localStorage.removeItem('pwa_dismissed');
   localStorage.setItem('pwa_version',PWA_VERSION);
@@ -2716,7 +2731,7 @@ function applyUiLang(lang){
   const t=T[lang]||T.de;
   const isEn=lang==='en';
 
-  // Header pill
+  // Header UI lang pill
   const uf=document.getElementById('uiLangFlag');
   const un=document.getElementById('uiLangName');
   if(uf)uf.textContent=isEn?'🇬🇧':'🇩🇪';
@@ -2730,7 +2745,7 @@ function applyUiLang(lang){
 
   // Buttons
   const ab=document.getElementById('analyseBtn');
-  if(ab){ab.innerHTML=t.analyse;}
+  if(ab)ab.innerHTML=t.analyse;
   const tb=document.getElementById('transcribeBtn');
   if(tb)tb.textContent=t.transcribe;
   const trainBtn=document.getElementById('trainBtn');
@@ -2742,19 +2757,19 @@ function applyUiLang(lang){
   const cx=document.getElementById('ctxIn');
   if(cx)cx.placeholder=t.context;
   const ci=document.getElementById('chatIn');
-  if(ci)ci.placeholder=t.chatPlaceholder;
+  if(ci)ci.placeholder=t.chatPlaceholder||t.placeholder;
 
   // Tabs
-  const tt=document.querySelector('[onclick="switchTab('text')"]');
-  const ta=document.querySelector('[onclick="switchTab('audio')"]');
-  const tc=document.querySelector('[onclick="switchTab('chat')"]');
-  if(tt)tt.textContent=t.tabText;
-  if(ta)ta.textContent=t.tabAudio;
-  if(tc)tc.textContent=t.tabChat;
+  document.querySelectorAll('.itab').forEach(tab=>{
+    const oc=tab.getAttribute('onclick')||'';
+    if(oc.includes("'text'"))tab.innerHTML='✦ '+t.tabText;
+    else if(oc.includes("'audio'"))tab.innerHTML='◎ '+t.tabAudio;
+    else if(oc.includes("'chat'"))tab.innerHTML='⊞ '+t.tabChat;
+  });
 
-  // Source chips
-  const chipMap={partner:t.partner,mother:t.mother,father:t.father,friend:t.friend,colleague:t.colleague,other:t.other};
-  // Translate chips by their current onclick value
+  // Source chips — map by onclick value
+  const chipMap={partner:t.partner,mother:t.mother,father:t.father,
+    friend:t.friend,colleague:t.colleague,other:t.other};
   document.querySelectorAll('.chip').forEach(c=>{
     const oc=c.getAttribute('onclick')||'';
     for(const key of Object.keys(chipMap)){
@@ -2764,25 +2779,28 @@ function applyUiLang(lang){
 
   // Audio drop zone
   const dt=document.querySelector('.drop-title');
-  if(dt)dt.textContent=t.audioTitle;
+  if(dt)dt.textContent=t.audioTitle||'Audionachrichten auswählen';
   const ds=document.querySelector('.drop-sub');
-  if(ds)ds.textContent=t.audioSub;
+  if(ds)ds.textContent=t.audioSub||'Mehrere gleichzeitig möglich';
 
-  // Settings drawer labels
-  const sl=document.getElementById('t-outlang');
-  if(sl)sl.textContent=t.outputLang;
+  // Settings title (drawer-title)
   const settTitle=document.querySelector('.drawer-title');
-  if(settTitle)settTitle.textContent=t.settings;
+  if(settTitle)settTitle.textContent=t.settings||'Einstellungen';
 
-  // Gate
+  // Output lang label in settings
+  const ol=document.getElementById('t-outlang');
+  if(ol)ol.textContent=t.outputLang||'Ausgabe-Sprache';
+
+  // Gate texts
   const gSub=document.querySelector('.gate-sub');
-  if(gSub)gSub.innerHTML=isEn?'Enter your access code<br>to open the app.':t.pinBack?'Gib deinen Zugangscode ein<br>um die App zu öffnen.':'';
+  if(gSub)gSub.innerHTML=isEn
+    ?'Enter your access code<br>to open the app.'
+    :'Gib deinen Zugangscode ein<br>um die App zu öffnen.';
   const gBtn=document.getElementById('gate-btn');
-  if(gBtn)gBtn.textContent=t.pinBtn;
+  if(gBtn&&!gBtn.disabled)gBtn.textContent=t.pinBtn||'Zugang öffnen →';
   const gBack=document.querySelector('.gate-back');
-  if(gBack)gBack.textContent=t.pinBack;
+  if(gBack)gBack.textContent=isEn?'← Back to home':'← Zur Startseite';
 
-  // html lang attr
   document.documentElement.lang=lang;
 }
 
@@ -2807,13 +2825,18 @@ function toggleModelQuick(e){
 function setModelQuick(id,lbl,type){
   setModel(id,lbl,type);
   document.getElementById('modelQuick').classList.remove('open');
+  // Sync quick dropdown
   document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
   const mq=document.getElementById('mq-'+id);
   if(mq)mq.classList.add('sel');
-  // sync settings drawer
-  document.querySelectorAll('.mopt').forEach(o=>o.classList.remove('sel'));
-  const opt=document.querySelector('.mopt[onclick*=\''+id+'\']');
-  if(opt)opt.classList.add('sel');
+  // Sync settings drawer
+  document.querySelectorAll('#model-opts .mopt').forEach(o=>{
+    o.classList.remove('sel');o.style.background='';
+  });
+  document.querySelectorAll('#model-opts .mopt').forEach(o=>{
+    if((o.getAttribute('onclick')||'').includes("'"+id+"'"))
+      {o.classList.add('sel');o.style.background='rgba(42,71,64,.06)';}
+  });
 }
 
 // ── Usage exhausted error ─────────────────────────────────────
