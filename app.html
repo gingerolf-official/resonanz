@@ -501,7 +501,7 @@ audio{width:100%;height:28px;margin-top:6px}
 
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
 <!-- Access Gate -->
-<div id="access-gate">
+<div id="access-gate" style="display:none">
   <div class="gate-box">
     <div class="gate-logo">✦ Resonanz</div>
     <p class="gate-sub">Gib deinen Zugangscode ein<br>um die App zu öffnen.</p>
@@ -559,10 +559,13 @@ function dismissGate(){
   if(gate) gate.style.display = 'none';
 }
 
-// Auto-unlock if token stored locally (persists across sessions)
+// Show gate only if no valid token stored
 const existingToken = localStorage.getItem(GATE_KEY);
 if(existingToken) {
-  dismissGate();
+  // Already authenticated — stay hidden (default)
+} else {
+  // Show gate — user needs to enter code
+  document.getElementById('access-gate').style.display = 'flex';
 }
 </script>
 
@@ -788,6 +791,25 @@ if(existingToken) {
           <div class="sw on" id="tsw-train" onclick="toggleSw(this,'train')"></div>
         </div>
       </div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-label">Analyse-Tiefe</div>
+      <div style="display:flex;gap:6px">
+        <div class="detail-opt sel" data-val="simple" onclick="setGfkDetail(this,'simple')"
+          style="flex:1;padding:10px;border-radius:10px;border:.5px solid var(--bds);text-align:center;cursor:pointer;font-size:13px;transition:all .15s">
+          <div style="font-size:16px;margin-bottom:3px">◎</div>
+          <div style="font-weight:500;color:var(--p)">Einfach</div>
+          <div style="font-size:11px;color:var(--txs);margin-top:1px">Klar & kompakt</div>
+        </div>
+        <div class="detail-opt" data-val="detailed" onclick="setGfkDetail(this,'detailed')"
+          style="flex:1;padding:10px;border-radius:10px;border:.5px solid var(--bds);text-align:center;cursor:pointer;font-size:13px;transition:all .15s">
+          <div style="font-size:16px;margin-bottom:3px">✦</div>
+          <div style="font-weight:500;color:var(--p)">Detailliert</div>
+          <div style="font-size:11px;color:var(--txs);margin-top:1px">Tief & strukturiert</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--txs);margin-top:6px">Bestimmt wie ausführlich die GFK-Analyse ausfällt</div>
     </div>
 
     <div class="drawer-section">
@@ -1555,6 +1577,18 @@ function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.con
 function updateWhisperEngineUI(){}
 
 // ── Output language ───────────────────────────────
+function setGfkDetail(el, val){
+  S.gfkDetail = val;
+  document.querySelectorAll('.detail-opt').forEach(o=>{
+    const isSelected = o.dataset.val === val;
+    o.classList.toggle('sel', isSelected);
+    o.style.background = isSelected ? 'rgba(42,71,64,.07)' : '';
+    o.style.borderColor = isSelected ? 'var(--p)' : '';
+  });
+  saveSettings();
+  showToast(val === 'detailed' ? 'Detaillierte Analyse ✓' : 'Kompakte Analyse ✓');
+}
+
 function pickLang(el,code,name){
   S.outputLang=code;S.outputLangName=name;
   const flags={de:'🇩🇪',en:'🇬🇧',es:'🇪🇸',fr:'🇫🇷',it:'🇮🇹',tr:'🇹🇷',ar:'🇸🇦',ru:'🇷🇺',zh:'🇨🇳',ja:'🇯🇵',pt:'🇧🇷',nl:'🇳🇱'};
@@ -1823,17 +1857,7 @@ function getText(){
 
 // ── Prompts ───────────────────────────────────────
 
-function setGfkDetail(el, val){
-  S.gfkDetail = val;
-  document.querySelectorAll('.detail-opt').forEach(o=>{
-    const isActive = o.dataset.val === val;
-    o.classList.toggle('sel', isActive);
-    o.style.background = isActive ? 'var(--p)' : '';
-    o.style.color = isActive ? 'white' : '';
-    o.style.borderColor = isActive ? 'var(--p)' : '';
-  });
-  saveSettings();
-}
+
 
 function buildGFKPrompt(msg, ctx){
   const srcMap={partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'};
@@ -1842,31 +1866,49 @@ function buildGFKPrompt(msg, ctx){
   const langInstr = langMap[lang] || 'Respond in '+lang+'.';
   const src = srcMap[S.src]||'einer anderen Person';
   const isDetailed = S.gfkDetail === 'detailed';
-  const ctxPart = ctx ? '\nContext/Background: '+ctx : '';
-  const msgPart = '\nMessage from '+src+': "'+msg+'"';
+  const ctxPart = ctx ? '\nKontext: '+ctx : '';
+  const msgPart = '\nNachricht von '+src+': "'+msg+'"';
 
   if(isDetailed){
-    return `You are a deeply empathetic NVC (Nonviolent Communication) coach with expertise in trauma-informed communication. ${langInstr} Analyze this message thoroughly.${ctxPart}${msgPart}
+    return `You are a deeply empathetic NVC (Nonviolent Communication) coach. ${langInstr} Analyze thoroughly.${ctxPart}${msgPart}
 
-Reply ONLY with valid JSON, no markdown.
-
+Reply ONLY with valid JSON, no markdown:
 {
   "self": {
-    "observation": "Precise factual observation — what exactly was said/done, without interpretation",
-    "feeling": "The most likely genuine NVC feeling behind this message (not thoughts or judgments)",
+    "observation": "Exact factual observation without interpretation",
+    "feeling": "The genuine NVC feeling behind this message",
     "need": "The deep universal human need driving this feeling",
-    "need_context": "Brief explanation of why this need matters in this relationship dynamic",
-    "request": "A concrete, doable request I could make of myself right now",
-    "old_pattern": "What old relational pattern or wound might this be activating in me?"
+    "need_context": "Why this need matters in this relationship dynamic",
+    "request": "A concrete doable request I could make of myself right now",
+    "old_pattern": "What old relational pattern or wound might this activate?"
   },
-  "response": "Empathetic NVC response to send (3-5 sentences, warm and connecting, acknowledging their feeling and need without losing yourself)",
-  "response_tip": "One specific tip for delivery: tone, timing, or context",
-  "summary": "Neutral 3-4 sentence summary of the dynamic at play",
-  "communication_pattern": "Name the communication pattern visible in this message (e.g. criticism as need expression, distancing as fear of intimacy, etc.)",
-  "relationship_insight": "One deeper insight about this relationship dynamic worth reflecting on",
-  "tags": ["tag1", "tag2", "tag3"],
-  "triggers": [{"phrase": "exact triggering phrase", "explanation": "which old wound or pattern does this activate?", "somatic": "possible body sensation this might cause"}],
-  "growth_impulse": "One concrete thing I could practice or reflect on to grow from this interaction"
+  "response": "Empathetic NVC response to send (3-5 sentences, warm and connecting)",
+  "response_tip": "One specific tip for tone, timing, or context",
+  "summary": "Neutral 3-4 sentence summary of the dynamic",
+  "communication_pattern": "Name the communication pattern in this message",
+  "relationship_insight": "One deeper insight about this relationship dynamic",
+  "tags": ["tag1","tag2","tag3"],
+  "triggers": [{"phrase":"exact phrase","explanation":"which wound does this activate?","somatic":"possible body sensation"}],
+  "growth_impulse": "One concrete thing to practice or reflect on"
+}`;
+  }
+
+  // Simple mode — structured but concise
+  return `You are an empathetic NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
+
+Reply ONLY with valid JSON, no markdown:
+{
+  "self": {
+    "observation": "What was factually said or done (one sentence, no interpretation)",
+    "feeling": "The main feeling this likely triggers in the receiver",
+    "need": "The core human need behind this feeling",
+    "request": "One concrete thing I could do or ask for right now"
+  },
+  "response": "A warm, clear NVC response to send (2-3 sentences)",
+  "summary": "2-3 sentence neutral summary of what is really being communicated",
+  "tags": ["tag1","tag2"],
+  "triggers": [{"phrase":"most triggering phrase","explanation":"brief explanation"}]
+}`;
 }`;
   } else {
     return `You are a warm NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
