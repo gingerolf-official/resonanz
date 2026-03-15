@@ -510,7 +510,7 @@ audio{width:100%;height:28px;margin-top:6px}
       onkeydown="if(event.key==='Enter')checkCode()">
     <div class="gate-err" id="gate-err"></div>
     <button class="gate-btn" id="gate-btn" onclick="checkCode()">Zugang öffnen →</button>
-    <a href="https://resonanz.chat" class="gate-back">← Zur Startseite</a>
+    <a href="https://resonanz.chat" class="gate-back" href="https://resonanz.chat">← Zur Startseite</a>
   </div>
 </div>
 
@@ -546,7 +546,9 @@ async function checkCode(){
       input.focus();
     }
   } catch(e) {
-    err.textContent = 'Verbindungsfehler — bitte nochmal versuchen';
+    // Show real error for debugging
+    err.textContent = 'Verbindungsfehler: ' + (e.message || 'unbekannt');
+    console.error('Gate error:', e);
   }
   btn.textContent = 'Zugang öffnen →';
   btn.disabled = false;
@@ -2753,9 +2755,12 @@ function applyUiLang(lang){
 
   // Source chips
   const chipMap={partner:t.partner,mother:t.mother,father:t.father,friend:t.friend,colleague:t.colleague,other:t.other};
-  document.querySelectorAll('.chip[onclick]').forEach(c=>{
-    const m=c.getAttribute('onclick').match(/'(\w+)'\)/);
-    if(m&&chipMap[m[1]])c.textContent=chipMap[m[1]];
+  // Translate chips by their current onclick value
+  document.querySelectorAll('.chip').forEach(c=>{
+    const oc=c.getAttribute('onclick')||'';
+    for(const key of Object.keys(chipMap)){
+      if(oc.includes("'"+key+"'")){c.textContent=chipMap[key];break;}
+    }
   });
 
   // Audio drop zone
