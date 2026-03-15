@@ -487,6 +487,14 @@ audio{width:100%;height:28px;margin-top:6px}
 .gate-back{font-size:12px;color:#8A9C94;text-decoration:none;display:block;margin-top:12px}
 .gate-back:hover{color:#2A4740}
 
+
+.model-quick{position:absolute;top:calc(100% + 8px);right:0;background:var(--sur);border:.5px solid var(--bds);border-radius:12px;padding:6px;min-width:160px;z-index:300;display:none;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.model-quick.open{display:block}
+.mq-opt{padding:9px 12px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--tx);transition:background .1s}
+.mq-opt:hover{background:var(--sur2)}
+.mq-opt.sel{background:rgba(42,71,64,.08);color:var(--p);font-weight:500}
+.mq-dot{width:8px;height:8px;border-radius:50%;background:var(--p);flex-shrink:0}
+.mq-dot.loc{background:var(--gold)}
 </style>
 </head>
 <body>
@@ -812,7 +820,7 @@ if(existingToken) {
   <!-- Header -->
   <div class="hdr">
     <div class="hdr-brand"><a href="https://resonanz.chat" style="color:var(--p);text-decoration:none">Resonanz</a></div>
-    <div class="hdr-right">
+    <div class="hdr-right"
       <div class="mpill" id="mpill" onclick="openSettings()" title="KI-Modell wechseln" style="cursor:pointer">
         <div class="mdot" id="pdot"></div>
         <span id="plbl">Claude Sonnet</span>
@@ -1285,7 +1293,7 @@ function clearSavedKeys() {
   localStorage.removeItem(KEY_STORE);
   document.getElementById('ckey').value = '';
   document.getElementById('okey').value = '';
-  document.getElementById('wkey').value = '';
+  // wkey handled by backend
   showKeysSavedState(false);
   showToast('Keys gelöscht');
 }
@@ -1560,7 +1568,6 @@ async function trOpenAI(file,lang){
   fd.append('audio',sendFile);
   const r=await fetch(BACKEND+'/api/transcribe?lang='+encodeURIComponent(lang||'de'),{
     method:'POST',
-    headers:{'x-resonanz-token': sessionStorage.getItem('resonanz_token_v1')||''},
     body:fd
   });
   if(!r.ok){
@@ -1730,7 +1737,12 @@ async function callAPI(prompt){
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
-    throw new Error(e.error||`Server-Fehler ${r.status} — Backend erreichbar?`);
+    const msg=e.error||'';
+    if(msg.toLowerCase().includes('credit')||msg.toLowerCase().includes('quota')||msg.toLowerCase().includes('billing')||msg.toLowerCase().includes('insufficient')||r.status===402){
+      showUsageError(S.model==='claude'?'Anthropic':'OpenAI');
+      throw new Error('usage_exhausted');
+    }
+    throw new Error(msg||'Server-Fehler '+r.status+' — Backend erreichbar?');
   }
   const d=await r.json();
   return d.result;
@@ -2613,6 +2625,76 @@ if('serviceWorker' in navigator){
     if(hint)hint.style.display='block';
   }
 })();
+
+
+// ── UI Language DE/EN ─────────────────────────────────────────
+const UI_LANG_KEY='resonanz_ui_lang';
+let uiLang=localStorage.getItem(UI_LANG_KEY)||'de';
+
+const T={
+  de:{analyse:'✦ GFK-Analyse starten',transcribe:'Jetzt transkribieren',placeholder:'Nachricht hier eingeben…',context:'Kontext (optional) — hilft der KI besser zu verstehen:'},
+  en:{analyse:'✦ Start NVC Analysis',transcribe:'Transcribe now',placeholder:'Enter message here…',context:'Context (optional) — helps the AI understand better:'}
+};
+
+function applyUiLang(lang){
+  uiLang=lang;
+  localStorage.setItem(UI_LANG_KEY,lang);
+  const t=T[lang]||T.de;
+  document.getElementById('uiLangFlag').textContent=lang==='en'?'🇬🇧':'🇩🇪';
+  document.getElementById('uiLangName').textContent=lang.toUpperCase();
+  const ab=document.getElementById('analyseBtn');
+  if(ab)ab.innerHTML=t.analyse;
+  const tb=document.getElementById('transcribeBtn');
+  if(tb)tb.textContent=t.transcribe;
+  const mi=document.getElementById('msgIn');
+  if(mi)mi.placeholder=t.placeholder;
+  const cx=document.getElementById('ctxIn');
+  if(cx)cx.placeholder=t.context;
+}
+
+function toggleUiLang(){applyUiLang(uiLang==='de'?'en':'de');}
+
+// ── Model quick-select ────────────────────────────────────────
+function toggleModelQuick(e){
+  if(e)e.stopPropagation();
+  const d=document.getElementById('modelQuick');
+  d.classList.toggle('open');
+  if(d.classList.contains('open')){
+    const close=function(ev){
+      if(!d.contains(ev.target)&&ev.target.id!=='mpill'){
+        d.classList.remove('open');
+        document.removeEventListener('click',close);
+      }
+    };
+    setTimeout(()=>document.addEventListener('click',close),50);
+  }
+}
+
+function setModelQuick(id,lbl,type){
+  setModel(id,lbl,type);
+  document.getElementById('modelQuick').classList.remove('open');
+  document.querySelectorAll('.mq-opt').forEach(o=>o.classList.remove('sel'));
+  const mq=document.getElementById('mq-'+id);
+  if(mq)mq.classList.add('sel');
+  // sync settings drawer
+  document.querySelectorAll('.mopt').forEach(o=>o.classList.remove('sel'));
+  const opt=document.querySelector('.mopt[onclick*=\''+id+'\']');
+  if(opt)opt.classList.add('sel');
+}
+
+// ── Usage exhausted error ─────────────────────────────────────
+function showUsageError(service){
+  const old=document.getElementById('api-error-card');if(old)old.remove();
+  const url=service==='Anthropic'?'https://console.anthropic.com/settings/billing':'https://platform.openai.com/settings/billing';
+  const card=document.createElement('div');
+  card.id='api-error-card';card.className='err-card';
+  card.innerHTML='<div class="err-icon">⚡</div><div style="flex:1"><div class="err-title">Guthaben aufgebraucht</div><div class="err-msg">Dein '+service+'-Guthaben ist erschöpft. Bitte Guthaben aufladen um weiterzumachen.</div><div class="err-actions"><a class="err-btn pri" href="'+url+'" target="_blank">Guthaben aufladen ↗</a><button class="err-btn sec" onclick="this.closest(\'.err-card\').remove()">Schließen</button></div></div>';
+  const s1=document.getElementById('screen-1');
+  if(s1)s1.appendChild(card);
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+(function(){applyUiLang(uiLang);})();
 
 // ── Init: load saved keys ────────────────────────
 (function(){
