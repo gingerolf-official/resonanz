@@ -1,9 +1,9 @@
-const CACHE = 'resonanz-v3';
+const CACHE = 'resonanz-v4';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['./','./index.html']).catch(()=>{}))
+    caches.open(CACHE).then(c => c.addAll(['./app.html']).catch(()=>{}))
   );
 });
 
@@ -15,7 +15,7 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Handle Share Target (POST from WhatsApp/Signal etc.)
+// Handle Share Target POST (von WhatsApp/Signal/etc.)
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
@@ -27,7 +27,7 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
 
   e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./index.html')))
+    caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match('./app.html')))
   );
 });
 
@@ -62,7 +62,8 @@ async function handleShare(req) {
       }
     }
   } catch (err) {
-    console.error('Share target error:', err);
+    console.error('Share error:', err);
   }
-  return Response.redirect('./?shared=1', 303);
+  // ← Wichtig: zur APP weiterleiten, nicht zur Landing Page
+  return Response.redirect('./app.html?shared=1', 303);
 }
