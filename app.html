@@ -501,39 +501,52 @@ audio{width:100%;height:28px;margin-top:6px}
       maxlength="20" autocomplete="off" spellcheck="false"
       onkeydown="if(event.key==='Enter')checkCode()">
     <div class="gate-err" id="gate-err"></div>
-    <button class="gate-btn" onclick="checkCode()">Zugang öffnen →</button>
+    <button class="gate-btn" id="gate-btn" onclick="checkCode()">Zugang öffnen →</button>
     <a href="https://resonanz.chat" class="gate-back">← Zur Startseite</a>
   </div>
 </div>
 
 <script>
-// ── Access codes (change these to your own!) ──────────────────
-// Add more codes for more users, e.g. 'FREUND-01', 'BETA-23' etc.
-const CODES = [
-  'RESONANZ-BETA',
-  'HERZ-OFFEN',
-  'GFK-2026',
-];
-const GATE_KEY = 'resonanz_access_v1';
+// ── Secure gate: code is verified on server, never in browser ──
+const GATE_KEY = 'resonanz_token_v1';
 
-function checkCode(){
-  const val = document.getElementById('gate-input').value.trim().toUpperCase();
+async function checkCode(){
+  const input = document.getElementById('gate-input');
+  const btn = document.getElementById('gate-btn');
   const err = document.getElementById('gate-err');
+  const val = input.value.trim();
   if(!val){ err.textContent='Bitte Code eingeben'; return; }
-  if(CODES.includes(val)){
-    sessionStorage.setItem(GATE_KEY,'1');
-    document.getElementById('access-gate').style.display='none';
-    err.textContent='';
-  } else {
-    err.textContent='Ungültiger Code — bitte nochmal prüfen';
-    document.getElementById('gate-input').value='';
-    document.getElementById('gate-input').focus();
+
+  btn.textContent = 'Prüfe…';
+  btn.disabled = true;
+  err.textContent = '';
+
+  try {
+    const r = await fetch(BACKEND + '/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: val })
+    });
+    const d = await r.json();
+    if (r.ok && d.token) {
+      sessionStorage.setItem(GATE_KEY, d.token);
+      document.getElementById('access-gate').style.display = 'none';
+    } else {
+      err.textContent = d.error || 'Ungültiger Code';
+      input.value = '';
+      input.focus();
+    }
+  } catch(e) {
+    err.textContent = 'Verbindungsfehler — bitte nochmal versuchen';
   }
+  btn.textContent = 'Zugang öffnen →';
+  btn.disabled = false;
 }
 
-// Auto-unlock if already authenticated this session
-if(sessionStorage.getItem(GATE_KEY)==='1'){
-  document.getElementById('access-gate').style.display='none';
+// Auto-unlock if token exists in this session
+const existingToken = sessionStorage.getItem(GATE_KEY);
+if(existingToken) {
+  document.getElementById('access-gate').style.display = 'none';
 }
 </script>
 
@@ -1546,7 +1559,9 @@ async function trOpenAI(file,lang){
   const fd=new FormData();
   fd.append('audio',sendFile);
   const r=await fetch(BACKEND+'/api/transcribe?lang='+encodeURIComponent(lang||'de'),{
-    method:'POST',body:fd
+    method:'POST',
+    headers:{'x-resonanz-token': sessionStorage.getItem('resonanz_token_v1')||''},
+    body:fd
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
@@ -1707,7 +1722,10 @@ async function callAPI(prompt){
   // Cloud-Modelle → über Resonanz-Backend (kein Key im Browser)
   const r=await fetch(BACKEND+'/api/analyse',{
     method:'POST',
-    headers:{'Content-Type':'application/json'},
+    headers:{
+      'Content-Type':'application/json',
+      'x-resonanz-token': sessionStorage.getItem('resonanz_token_v1')||''
+    },
     body:JSON.stringify({prompt,model:S.model})
   });
   if(!r.ok){
