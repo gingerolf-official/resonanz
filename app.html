@@ -1314,6 +1314,7 @@ if(existingToken) {
 <div class="toast" id="toast"></div>
 
 <script>
+
 // ── State ──────────────────────────────────────────
 // ── Backend URL ── setze deine Vercel-URL hier ein
 const BACKEND = 'https://resonanz-backend.vercel.app'; // ← deine URL nach dem Deploy
@@ -1325,9 +1326,142 @@ const S={
   afiles:[],transcripts:[],popWord:null,
   lastGFK:null,curStep:1
 };
-
-// ── Settings Persistence ─────────────────────────────────────
+// ── Constants & State ────────────────────────────
+const KEY_STORE = 'resonanz_keys_v1';
 const SETTINGS_KEY = 'resonanz_settings_v1';
+const PRO_KEY = 'resonanz_pro_v1';
+const FREE_AUDIO_KEY = 'resonanz_free_audio_' + new Date().toDateString();
+const FREE_AUDIO_LIMIT = 3;
+const UI_LANG_KEY = 'resonanz_ui_lang';
+let uiLang = localStorage.getItem(UI_LANG_KEY) || 'de';
+
+const T = {
+  de: {
+    step1:'Eingabe', step2:'Analyse', step3:'Training', step4:'Verlauf', step5:'Karte',
+    analyse:'✦ GFK-Analyse starten', transcribe:'Jetzt transkribieren',
+    training:'Training starten',
+    placeholder:'Nachricht hier eingeben…',
+    context:'Kontext (optional) — hilft der KI besser zu verstehen:',
+    chatPlaceholder:'WhatsApp/Telegram Chat-Export hier einfügen…',
+    audioTitle:'Audionachrichten auswählen',
+    audioSub:'Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG, OPUS',
+    partner:'Partner·in', mother:'Mutter', father:'Vater',
+    friend:'Freund·in', colleague:'Kolleg·in', other:'Andere',
+    settings:'Einstellungen', outputLang:'Ausgabe-Sprache',
+    tabText:'Text', tabAudio:'Audio', tabChat:'Chat',
+    pinBtn:'Zugang öffnen →', pinBack:'← Zur Startseite',
+  },
+  en: {
+    step1:'Input', step2:'Analysis', step3:'Training', step4:'Journal', step5:'Map',
+    analyse:'✦ Start NVC Analysis', transcribe:'Transcribe now',
+    training:'Start training',
+    placeholder:'Enter message here…',
+    context:'Context (optional) — helps the AI understand better:',
+    chatPlaceholder:'Paste WhatsApp/Telegram chat export here…',
+    audioTitle:'Select voice messages',
+    audioSub:'Multiple at once · MP3, M4A, WAV, OGG, OPUS',
+    partner:'Partner', mother:'Mother', father:'Father',
+    friend:'Friend', colleague:'Colleague', other:'Other',
+    settings:'Settings', outputLang:'Output Language',
+    tabText:'Text', tabAudio:'Audio', tabChat:'Chat',
+    pinBtn:'Open →', pinBack:'← Back to home',
+  }
+};
+
+
+
+
+
+
+async function trOpenAI(file, lang) {
+  let sendFile = file;
+  if (file.name.toLowerCase().endsWith('.opus')) {
+    sendFile = new File([file], file.name.replace(/\.opus$/i, '.ogg'), {type: 'audio/ogg'});
+  }
+  const fd = new FormData();
+  fd.append('audio', sendFile);
+  const r = await fetch(BACKEND + '/api/transcribe?lang=' + encodeURIComponent(lang || 'de'), {
+    method: 'POST',
+    body: fd
+  });
+  if (!r.ok) {
+    const e = await r.json().catch(() => ({}));
+    throw new Error(e.error || 'Transkription Fehler ' + r.status);
+  }
+  const d = await r.json();
+  const words = (d.words || []).map(w => ({
+    word: w.word.trim(), start: w.start, end: w.end,
+    prob: Math.random() > .85 ? .25 + Math.random() * .3 : .85 + Math.random() * .14
+  }));
+  return {text: d.text, words};
+}
+
+function buildGFKPrompt(msg, ctx) {
+  if (S.tab === 'screenshot') return buildScreenshotPrompt(ctx);
+
+  const srcMap = {
+    partner: 'Partner/Partnerin', mother: 'Mutter', father: 'Vater',
+    friend: 'Freund/Freundin', colleague: 'Kolleg/in', other: 'einer anderen Person'
+  };
+  const lang = S.outputLang || 'de';
+  const langMap = {
+    de: 'Antworte auf Deutsch.', en: 'Respond in English.',
+    es: 'Responde en español.', fr: 'Réponds en français.',
+    it: 'Rispondi in italiano.', tr: 'Türkçe yanıt ver.',
+    ar: 'أجب باللغة العربية.', ru: 'Отвечай на русском языке.',
+    zh: '用中文回答。', ja: '日本語で回答してください。',
+    pt: 'Responda em português.', nl: 'Antwoord in het Nederlands.'
+  };
+  const langInstr = langMap[lang] || 'Respond in ' + lang + '.';
+  const src = srcMap[S.src] || 'einer anderen Person';
+  const isDetailed = S.gfkDetail === 'detailed';
+  const ctxPart = ctx ? '\nKontext: ' + ctx : '';
+  const msgPart = '\nNachricht von ' + src + ': "' + msg + '"';
+
+  const jsonSimple = JSON.stringify({
+    self: {
+      observation: "Was wurde tatsächlich gesagt/getan (eine Satz, keine Interpretation)",
+      feeling: "Das Hauptgefühl das diese Nachricht auslöst",
+      need: "Das zentrale menschliche Bedürfnis dahinter",
+      request: "Eine konkrete Bitte an mich selbst"
+    },
+    response: "Einfühlsame GFK-Antwort (2-3 Sätze)",
+    summary: "Neutrale Zusammenfassung in 2-3 klaren Sätzen",
+    tags: ["tag1", "tag2"],
+    triggers: [{phrase: "auslösende Phrase", explanation: "kurze Erklärung"}]
+  }, null, 2);
+
+  const jsonDetailed = JSON.stringify({
+    self: {
+      observation: "Genaue faktische Beobachtung ohne Interpretation",
+      feeling: "Das echte GFK-Gefühl hinter dieser Nachricht",
+      need: "Das tiefe universelle Bedürfnis dahinter",
+      need_context: "Warum dieses Bedürfnis in dieser Beziehung wichtig ist",
+      request: "Eine konkrete Bitte die ich mir selbst stellen könnte",
+      old_pattern: "Welches alte Muster oder Wunde könnte das aktivieren?"
+    },
+    response: "Einfühlsame GFK-Antwort (3-5 Sätze, warm und verbindend)",
+    response_tip: "Ein spezifischer Tipp für Ton, Timing oder Kontext",
+    summary: "Neutrale 3-4 Satz Zusammenfassung der Dynamik",
+    communication_pattern: "Das sichtbare Kommunikationsmuster benennen",
+    relationship_insight: "Eine tiefere Einsicht über diese Beziehungsdynamik",
+    tags: ["tag1", "tag2", "tag3"],
+    triggers: [{phrase: "auslösende Phrase", explanation: "welche Wunde aktiviert das?", somatic: "mögliche Körperempfindung"}],
+    growth_impulse: "Eine konkrete Übung oder Reflexion zum Wachsen"
+  }, null, 2);
+
+  const promptSimple = 'You are an empathetic NVC coach. ' + langInstr +
+    ' Analyze this message clearly and concisely.' + ctxPart + msgPart +
+    '\n\nReply ONLY with valid JSON, no markdown:\n' + jsonSimple;
+
+  const promptDetailed = 'You are a deeply empathetic NVC coach. ' + langInstr +
+    ' Analyze this message thoroughly.' + ctxPart + msgPart +
+    '\n\nReply ONLY with valid JSON, no markdown:\n' + jsonDetailed;
+
+  return isDetailed ? promptDetailed : promptSimple;
+}
+
+
 
 function saveSettings(){
   try{
@@ -1346,6 +1480,7 @@ function saveSettings(){
     }));
   }catch(e){}
 }
+
 
 function loadSettings(){
   try{
@@ -1408,8 +1543,6 @@ function loadSettings(){
 }
 
 
-
-// ── Model selection (settings drawer only) ────────
 function pickModel(el,id,lbl,type){
   setModel(id,lbl,type);
   document.querySelectorAll('#model-opts .mopt').forEach(o=>{
@@ -1421,6 +1554,8 @@ function pickModel(el,id,lbl,type){
   if(mq)mq.classList.add('sel');
   saveSettings();
 }
+
+
 function setModel(id,lbl,type){
   S.model=id;S.mtype=type;
   document.getElementById('plbl').textContent=lbl;
@@ -1438,9 +1573,13 @@ function setModel(id,lbl,type){
   if(mq)mq.classList.add('sel');
 }
 
-// ── Settings drawer ───────────────────────────────
+
 function openSettings(){document.getElementById('settingsOv').classList.add('open')}
+
+
 function closeSettings(){document.getElementById('settingsOv').classList.remove('open')}
+
+
 function showInstallGuide(){
   const el=document.getElementById('installGuideOv');
   if(el)el.classList.add('open');
@@ -1448,8 +1587,6 @@ function showInstallGuide(){
   else showToast('Im Browser-Menü: Zum Startbildschirm hinzufügen');
 }
 
-// ── Key persistence (XOR + PIN, localStorage) ────
-const KEY_STORE = 'resonanz_keys_v1';
 
 function xorCrypt(str, pin) {
   // Simple XOR with PIN — not bulletproof but protects against casual snooping
@@ -1459,6 +1596,8 @@ function xorCrypt(str, pin) {
   }
   return btoa(unescape(encodeURIComponent(out)));
 }
+
+
 function xorDecrypt(b64, pin) {
   try {
     const str = decodeURIComponent(escape(atob(b64)));
@@ -1469,6 +1608,7 @@ function xorDecrypt(b64, pin) {
     return out;
   } catch { return ''; }
 }
+
 
 function saveKeys() {
   const pin = document.getElementById('keyPin').value.trim();
@@ -1493,6 +1633,7 @@ function saveKeys() {
   // Orange pill border gone
   document.getElementById('mpill').style.borderColor = 'var(--bd)';
 }
+
 
 function loadKeys(pin) {
   const stored = localStorage.getItem(KEY_STORE);
@@ -1525,6 +1666,7 @@ function loadKeys(pin) {
   } catch(e) { console.error('loadKeys error:',e); return false; }
 }
 
+
 function clearSavedKeys() {
   if (!confirm('Gespeicherte Keys löschen?')) return;
   localStorage.removeItem(KEY_STORE);
@@ -1535,10 +1677,12 @@ function clearSavedKeys() {
   showToast('Keys gelöscht');
 }
 
+
 function showKeysSavedState(saved) {
   document.getElementById('keys-saved-bar').style.display = saved ? 'flex' : 'none';
   document.getElementById('key-save-row').style.display = saved ? 'none' : '';
 }
+
 
 function promptPinAndLoad() {
   // Only if keys are stored
@@ -1565,6 +1709,7 @@ function promptPinAndLoad() {
   setTimeout(() => document.getElementById('pin-input')?.focus(), 100);
 }
 
+
 function tryLoadPin(pin) {
   if (pin.length < 4) return;
   const ok = loadKeys(pin);
@@ -1579,6 +1724,7 @@ function tryLoadPin(pin) {
   }
 }
 
+
 function updateKeyStatus(which, val) {
   const el = document.getElementById('key-status-'+which);
   if (!el) return;
@@ -1589,38 +1735,6 @@ function updateKeyStatus(which, val) {
   el.style.color = ok ? 'var(--p)' : 'var(--acc)';
 }
 
-function showCorsError(){
-  const old=document.getElementById('api-error-card');if(old)old.remove();
-  const card=document.createElement('div');
-  card.id='api-error-card';card.className='err-card';
-  card.innerHTML=`
-    <div class="err-icon">🚧</div>
-    <div style="flex:1">
-      <div class="err-title">Verbindung blockiert (CORS)</div>
-      <div class="err-msg">Dein Browser blockiert den direkten Kontakt zur Whisper API. Das passiert bei Brave, Firefox und manchen Chrome-Einstellungen.</div>
-      <div class="err-msg" style="margin-top:6px;font-weight:500;color:var(--p)">Lösung: Cloudflare Worker als kostenloser Proxy (2 Minuten):</div>
-      <div class="err-msg" style="margin-top:4px">1. <a href="https://workers.cloudflare.com" target="_blank" style="color:var(--p)">workers.cloudflare.com</a> → kostenlosen Account erstellen<br>
-      2. "Create Worker" → Code aus <strong>whisper-worker.js</strong> einfügen → Deploy<br>
-      3. Worker-URL in ⚙ Einstellungen → Audio-Transkription eintragen</div>
-      <div class="err-actions">
-        <button class="err-btn pri" onclick="openSettings();document.getElementById('api-error-card')?.remove()">⚙ Einstellungen öffnen</button>
-        <button class="err-btn sec" onclick="this.closest('.err-card').remove()">Schließen</button>
-      </div>
-    </div>`;
-  document.getElementById('screen-1').appendChild(card);
-  card.scrollIntoView({behavior:'smooth',block:'nearest'});
-}
-
-function updateProxyStatus(val){
-  const el=document.getElementById('proxy-status');
-  const hint=document.getElementById('proxy-hint');
-  if(!el)return;
-  if(!val){el.textContent='';if(hint)hint.style.display='block';return;}
-  const ok=val.startsWith('https://')&&val.includes('workers.dev');
-  el.textContent=ok?'✓ Format sieht korrekt aus':'⚠ Sollte mit https://...workers.dev enden';
-  el.style.color=ok?'var(--p)':'var(--acc)';
-  if(hint)hint.style.display='none';
-}
 
 function updatePillStatus() {
   const pill = document.getElementById('mpill');
@@ -1631,12 +1745,10 @@ function updatePillStatus() {
   pill.style.borderColor = hasKey ? 'var(--bd)' : 'rgba(181,90,44,.35)';
 }
 
-// ── Toggle switches ───────────────────────────────
+
 function toggleSw(el,key){el.classList.toggle('on');S.togs[key]=el.classList.contains('on');saveSettings();}
 
-function updateWhisperEngineUI(){}
 
-// ── Output language ───────────────────────────────
 function setGfkDetail(el, val){
   S.gfkDetail = val;
   document.querySelectorAll('.detail-opt').forEach(o=>{
@@ -1648,6 +1760,7 @@ function setGfkDetail(el, val){
   saveSettings();
   showToast(val === 'detailed' ? 'Detaillierte Analyse ✓' : 'Kompakte Analyse ✓');
 }
+
 
 function pickLang(el,code,name){
   S.outputLang=code;S.outputLangName=name;
@@ -1663,7 +1776,7 @@ function pickLang(el,code,name){
   saveSettings();
 }
 
-// ── Steps ─────────────────────────────────────────
+
 function goStep(n){
   if(n===4){
     S.curStep=4;
@@ -1682,21 +1795,20 @@ function goStep(n){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
-// ── Input tabs ─────────────────────────────────────
 
-
-// ── Source chips ──────────────────────────────────
 function setSrc(el,v){
   document.querySelectorAll('#screen-1 .chip').forEach(c=>c.classList.remove('act'));
   el.classList.add('act');S.src=v;
 }
 
-// ── Audio ─────────────────────────────────────────
+
 function doDrop(e){
   e.preventDefault();document.getElementById('adrop').classList.remove('drag');
   const fs=[...e.dataTransfer.files].filter(f=>f.type.startsWith('audio/'));
   if(fs.length)addFiles(fs);
 }
+
+
 function addFiles(fl){
   [...fl].forEach(f=>{
     if(S.afiles.find(x=>x.name===f.name&&x.size===f.size))return;
@@ -1705,12 +1817,18 @@ function addFiles(fl){
   });
   renderAList();document.getElementById('aIn').value='';
 }
+
+
 function retryFile(id){
   const af=S.afiles.find(f=>f.id===id);
   if(af){af.status='p';setStat(id,'p');renderAList();}
   transcribeAll();
 }
+
+
 function removeAF(id){S.afiles=S.afiles.filter(f=>f.id!==id);S.transcripts=S.transcripts.filter(t=>t.id!==id);renderAList();renderTRs();}
+
+
 function renderAList(){
   const l=document.getElementById('alist');
   const ta=document.getElementById('transcribe-action');
@@ -1746,16 +1864,30 @@ function renderAList(){
     else hint.textContent='Transkript erscheint nach jeder Datei';
   }
 }
+
+
 function setDur(id,el){const d=el.duration;if(d&&isFinite(d))document.getElementById('dur_'+id).textContent=fT(d)}
+
+
 function togglePlay(id){
   const a=document.getElementById('aud_'+id),w=document.getElementById('aw_'+id),b=document.getElementById('ap_'+id);
   if(!a)return;w.style.display='block';
   if(a.paused){a.play();b.textContent='■';}else{a.pause();b.textContent='▶';}
 }
+
+
 function resetPB(id){const b=document.getElementById('ap_'+id);if(b)b.textContent='▶';}
+
+
 function fmtSz(b){return b>1048576?(b/1048576).toFixed(1)+' MB':(b/1024).toFixed(0)+' KB'}
+
+
 function fT(s){const m=Math.floor(s/60);return m+':'+(Math.floor(s%60)+'').padStart(2,'0')}
+
+
 function stLbl(s){return{p:'Ausstehend',t:'Transkribiere…',d:'✓ Fertig',e:'Fehler'}[s]||s}
+
+
 function setStat(id,s){
   const el=document.getElementById('ast_'+id);
   if(el){el.textContent=stLbl(s);el.className='astat '+s+'_';}
@@ -1776,7 +1908,7 @@ function setStat(id,s){
   }
 }
 
-// ── Transcription ─────────────────────────────────
+
 async function transcribeAll(){
   const pend=S.afiles.filter(f=>f.status==='p');
   if(!pend.length)return;
@@ -1816,29 +1948,6 @@ async function transcribeAll(){
 }
 
 
-async function trOpenAI(file,lang){
-  // .opus → .ogg (same codec, Whisper doesn't accept .opus filename)
-  let sendFile=file;
-  if(file.name.toLowerCase().endsWith('.opus')){
-    sendFile=new File([file],file.name.replace(/\.opus$/i,'.ogg'),{type:'audio/ogg'});
-  }
-  const fd=new FormData();
-  fd.append('audio',sendFile);
-  const r=await fetch(BACKEND+'/api/transcribe?lang='+encodeURIComponent(lang||'de'),{
-    method:'POST',
-    body:fd
-  });
-  if(!r.ok){
-    const e=await r.json().catch(()=>({}));
-    throw new Error(e.error||`Transkription Fehler ${r.status}`);
-  }
-  const d=await r.json();
-  const words=(d.words||[]).map(w=>({
-    word:w.word.trim(),start:w.start,end:w.end,
-    prob:Math.random()>.85?.25+Math.random()*.3:.85+Math.random()*.14
-  }));
-  return{text:d.text,words};
-}
 function simTR(){
   const base=[
     {word:'Ich',start:.1,end:.4,prob:.98},{word:'wollte',start:.4,end:.75,prob:.95},{word:'dir',start:.8,end:.95,prob:.97},
@@ -1856,6 +1965,8 @@ function simTR(){
   ];
   return{text:base.map(w=>w.word).join(' '),words:base};
 }
+
+
 function renderTRs(){
   const area=document.getElementById('trArea');
   if(!S.transcripts.length){area.innerHTML='';return;}
@@ -1871,6 +1982,8 @@ function renderTRs(){
     </div>`;
   }).join('');
 }
+
+
 function renderWords(tr){
   if(!tr.words||!tr.words.length)return`<span>${tr.text}</span>`;
   return tr.words.map(w=>{
@@ -1879,7 +1992,7 @@ function renderWords(tr){
   }).join('');
 }
 
-// ── Word popup ────────────────────────────────────
+
 function openPop(e,trId,url,start,end,wEnc){
   e.stopPropagation();
   const word=decodeURIComponent(wEnc);
@@ -1896,7 +2009,11 @@ function openPop(e,trId,url,start,end,wEnc){
   pop.classList.add('open');
   setTimeout(()=>document.getElementById('wpop-in').focus(),50);
 }
+
+
 function closePop(){document.getElementById('wpop').classList.remove('open');document.getElementById('wpop-aud').pause();S.popWord=null;}
+
+
 function applyFix(){
   if(!S.popWord)return;
   const nw=document.getElementById('wpop-in').value.trim();if(!nw)return;
@@ -1907,10 +2024,8 @@ function applyFix(){
   tr.text=tr.words.map(w=>w.word).join(' ');
   renderTRs();closePop();showToast('Wort korrigiert ✓');
 }
-document.addEventListener('click',e=>{if(!document.getElementById('wpop').contains(e.target))closePop();});
-document.getElementById('wpop-in').addEventListener('keydown',e=>{if(e.key==='Enter')applyFix();if(e.key==='Escape')closePop();});
 
-// ── Get message ───────────────────────────────────
+
 function getText(){
   if(S.tab==='text')return document.getElementById('msgIn').value.trim();
   if(S.tab==='chat')return document.getElementById('chatIn').value.trim();
@@ -1923,15 +2038,6 @@ function getText(){
   return'';
 }
 
-// ── Prompts ───────────────────────────────────────
-
-
-
-
-// ── Pro Tier System ───────────────────────────────────────
-const PRO_KEY = 'resonanz_pro_v1';
-const FREE_AUDIO_KEY = 'resonanz_free_audio_' + new Date().toDateString();
-const FREE_AUDIO_LIMIT = 3;
 
 function checkProStatus(){
   // Pro = access code that starts with PRO- OR stored pro flag
@@ -1943,15 +2049,18 @@ function checkProStatus(){
   S.isPro = false;
 }
 
+
 function getFreeAudioUsed(){
   return parseInt(localStorage.getItem(FREE_AUDIO_KEY)||'0',10);
 }
+
 
 function incrementFreeAudio(){
   const used = getFreeAudioUsed();
   localStorage.setItem(FREE_AUDIO_KEY, used+1);
   return used+1;
 }
+
 
 function showProWall(feature){
   const features = {
@@ -1973,24 +2082,13 @@ function showProWall(feature){
   return wall;
 }
 
+
 function openProUpgrade(){
   // For now: show info overlay
   showToast('Pro-Version: Zugangscode mit PRO- Prefix verwenden');
   openSettings();
 }
 
-function checkAudioProGate(){
-  if(S.isPro) return true;
-  const used = getFreeAudioUsed();
-  if(used < FREE_AUDIO_LIMIT) return true;
-  // Show pro wall in audio tab
-  const alist = document.getElementById('alist');
-  if(alist && !alist.querySelector('.pro-wall')){
-    alist.appendChild(showProWall('audio'));
-  }
-  showToast(`${FREE_AUDIO_LIMIT} kostenlose Transkriptionen heute aufgebraucht`);
-  return false;
-}
 
 function showFreeUsageIndicator(){
   if(S.isPro) return;
@@ -1999,13 +2097,12 @@ function showFreeUsageIndicator(){
   const indicator = document.getElementById('free-audio-indicator');
   if(!indicator) return;
   indicator.style.display = 'flex';
-  indicator.querySelector('.pi-free').textContent = remaining + ' kostenlose Transkriptions heute';
-  indicator.querySelector('.free-limit-fill').style.width = ((used/FREE_AUDIO_LIMIT)*100) + '%';
+  const piEl = indicator.querySelector('.pi-free');
+  const barEl = indicator.querySelector('.free-limit-fill');
+  if(piEl) piEl.textContent = remaining + ' kostenlose Transkriptionen heute';
+  if(barEl) barEl.style.width = ((used/FREE_AUDIO_LIMIT)*100) + '%';
 }
 
-
-// ── Screenshot Analysis ──────────────────────────────
-let screenshots = []; // [{name, size, dataUrl, file}]
 
 function switchITab(name, el){
   // Check pro gate for screenshot
@@ -2034,12 +2131,14 @@ function switchITab(name, el){
   if(target)target.style.display='';
 }
 
+
 function doScreenshotDrop(e){
   e.preventDefault();
   e.currentTarget.classList.remove('drag');
   const files = [...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/'));
   if(files.length) addScreenshots(files);
 }
+
 
 function addScreenshots(files){
   [...files].forEach(file=>{
@@ -2053,10 +2152,12 @@ function addScreenshots(files){
   });
 }
 
+
 function removeScreenshot(idx){
   screenshots.splice(idx,1);
   renderScreenshots();
 }
+
 
 function renderScreenshots(){
   const list = document.getElementById('screenshot-list');
@@ -2072,141 +2173,23 @@ function renderScreenshots(){
     </div>`).join('');
 }
 
+
 function getScreenshotData(){
   return screenshots.map(sc=>sc.dataUrl);
 }
 
-// Override getText to handle screenshot tab
-const _getTextOrig = getText;
-getText = function(){
-  if(S.tab === 'screenshot'){
-    return screenshots.length ? '[SCREENSHOT_ANALYSIS]' : '';
-  }
-  return _getTextOrig();
-};
 
-function buildGFKPrompt(msg, ctx){
-  // Screenshot mode — different prompt
-  if(S.tab==='screenshot'){
-    return buildScreenshotPrompt(ctx);
-  }
-  const srcMap={partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'};
-  const lang=S.outputLang||'de';
-  const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ar:'أجب باللغة العربية.',ru:'Отвечай на русском языке.',zh:'用中文回答。',ja:'日本語で回答してください。',pt:'Responda em português.',nl:'Antwoord in het Nederlands.'};
-  const langInstr = langMap[lang] || 'Respond in '+lang+'.';
-  const src = srcMap[S.src]||'einer anderen Person';
-  const isDetailed = S.gfkDetail === 'detailed';
-  const ctxPart = ctx ? '\nKontext: '+ctx : '';
-  const msgPart = '\nNachricht von '+src+': "'+msg+'"';
-
-  if(isDetailed){
-    return `You are a deeply empathetic NVC (Nonviolent Communication) coach. ${langInstr} Analyze thoroughly.${ctxPart}${msgPart}
-
-Reply ONLY with valid JSON, no markdown:
-{
-  "self": {
-    "observation": "Exact factual observation without interpretation",
-    "feeling": "The genuine NVC feeling behind this message",
-    "need": "The deep universal human need driving this feeling",
-    "need_context": "Why this need matters in this relationship dynamic",
-    "request": "A concrete doable request I could make of myself right now",
-    "old_pattern": "What old relational pattern or wound might this activate?"
-  },
-  "response": "Empathetic NVC response to send (3-5 sentences, warm and connecting)",
-  "response_tip": "One specific tip for tone, timing, or context",
-  "summary": "Neutral 3-4 sentence summary of the dynamic",
-  "communication_pattern": "Name the communication pattern in this message",
-  "relationship_insight": "One deeper insight about this relationship dynamic",
-  "tags": ["tag1","tag2","tag3"],
-  "triggers": [{"phrase":"exact phrase","explanation":"which wound does this activate?","somatic":"possible body sensation"}],
-  "growth_impulse": "One concrete thing to practice or reflect on"
-}`;
-  }
-
-function buildScreenshotPrompt(ctx){
-  const lang = S.outputLang||'de';
-  const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ru:'Отвечай на русском языке.'};
-  const langInstr = langMap[lang]||'Respond in '+lang+'.';
-  const isDetailed = S.gfkDetail==='detailed';
-  const ctxPart = ctx ? '\nKontext: '+ctx : '';
-  const src = {partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'}[S.src]||'einer anderen Person';
-
-  if(isDetailed){
-    return `You are an empathetic NVC coach. ${langInstr} Analyze the conversation screenshot(s) provided.${ctxPart}
-
-The screenshot shows a conversation with ${src}. Read all visible text carefully, then provide a deep NVC analysis.
-
-Reply ONLY with valid JSON:
-{
-  "transcript": "Full text you can read from the screenshot(s), formatted as conversation",
-  "self": {
-    "observation": "What was factually said/written, without interpretation",
-    "feeling": "The main feeling triggered by this conversation",
-    "need": "The core universal need behind this feeling",
-    "need_context": "Why this need matters in this relationship",
-    "request": "One concrete thing I could do or ask right now",
-    "old_pattern": "What old wound or pattern might this activate?"
-  },
-  "response": "Warm NVC response to send (3-5 sentences)",
-  "response_tip": "Specific tip for tone or timing",
-  "summary": "3-4 sentence neutral summary of the dynamic",
-  "communication_pattern": "Name the visible communication pattern",
-  "relationship_insight": "One deeper insight about this relationship",
-  "tags": ["tag1","tag2","tag3"],
-  "triggers": [{"phrase":"exact phrase","explanation":"what wound does this activate?","somatic":"possible body sensation"}],
-  "growth_impulse": "One thing to practice or reflect on"
-}`;
-  }
-
-  return `You are an empathetic NVC coach. ${langInstr} Analyze the conversation screenshot(s).${ctxPart}
-
-The screenshot shows a message from ${src}. Read the visible text and provide a concise NVC analysis.
-
-Reply ONLY with valid JSON:
-{
-  "transcript": "Text visible in the screenshot (formatted as conversation)",
-  "self": {
-    "observation": "What was factually written (one sentence)",
-    "feeling": "Main feeling this triggers",
-    "need": "Core human need behind this",
-    "request": "One concrete thing to do or ask"
-  },
-  "response": "Warm NVC response to send (2-3 sentences)",
-  "summary": "2-3 sentence neutral summary",
-  "tags": ["tag1","tag2"],
-  "triggers": [{"phrase":"most triggering phrase","explanation":"brief explanation"}]
-}`;
-}
-
-function buildTrainPrompt(origMsg,gfk,userResp,ctx){
-  const lang=S.outputLang||'de';
-  const langInstr=lang==='de'?'Antworte auf Deutsch.'
-    :lang==='en'?'Respond in English.'
-    :lang==='es'?'Responde en español.'
-    :lang==='fr'?'Réponds en français.'
-    :lang==='it'?'Rispondi in italiano.'
-    :lang==='tr'?'Türkçe yanıt ver.'
-    :lang==='ar'?'أجب باللغة العربية.'
-    :lang==='ru'?'Отвечай на русском языке.'
-    :lang==='zh'?'用中文回答。'
-    :lang==='ja'?'日本語で回答してください。'
-    :lang==='pt'?'Responda em português.'
-    :lang==='nl'?'Antwoord in het Nederlands.'
-    :`Respond in ${S.outputLangName||lang}.`;
-  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"short label","text":"what this response reveals about the user"}],"recipientPerspective":[{"icon":"emoji","label":"short label","text":"how it lands with the other person"}],"values":[{"name":"value name","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"short title","description":"short description"},"alternatives":[{"strategy":"name","effect":"short","text":"concrete response","tradeoff":"gain/loss"}],"pattern":"communication pattern described warmly","growth":"concrete growth impulse"}`;
-}
-
-// ── Key helpers ──────────────────────────────────
 function getKey(id){const el=document.getElementById(id);return el?el.value.trim():'';}
+
+
 function hasValidKey(){
   if(S.mtype==='local')return true;
   if(S.model==='claude')return getKey('ckey').length>10;
   if(S.model==='gpt4')return getKey('okey').length>10;
   return false;
 }
-function hasWhisperKey(){return getKey('wkey').length>10||getKey('okey').length>10;}
 
-// ── API calls — über Backend (keys nie im Browser) ──
+
 async function callAPI(prompt){
   // Ollama lokal — direkt, kein Backend nötig
   if(S.mtype==='local'){
@@ -2247,14 +2230,18 @@ async function callAPI(prompt){
   const d=await r.json();
   return d.result;
 }
+
+
 function parseJSON(raw){try{return JSON.parse(raw.replace(/```json|```/g,'').trim());}catch{return null;}}
 
-// ── Fehler-UI ─────────────────────────────────────
+
 function showKeyError(){
   const names={claude:'Anthropic API-Key (sk-ant-…)',gpt4:'OpenAI API-Key (sk-proj-…)',llama:'Ollama lokal (kein Key nötig — läuft Ollama?)',mistral:'Ollama lokal (kein Key nötig — läuft Ollama?)'};
   const name=names[S.model]||S.model;
   showAPIError('Kein '+name+' eingetragen.',true);
 }
+
+
 function showAPIError(msg, isKeyError=false){
   const old=document.getElementById('api-error-card');if(old)old.remove();
   const card=document.createElement('div');
@@ -2277,7 +2264,19 @@ function showAPIError(msg, isKeyError=false){
   card.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-// ── Full Reset ─────────────────────────────────────
+
+function showUsageError(service){
+  const old=document.getElementById('api-error-card');if(old)old.remove();
+  const url=service==='Anthropic'?'https://console.anthropic.com/settings/billing':'https://platform.openai.com/settings/billing';
+  const card=document.createElement('div');
+  card.id='api-error-card';card.className='err-card';
+  card.innerHTML='<div class="err-icon">⚡</div><div style="flex:1"><div class="err-title">Guthaben aufgebraucht</div><div class="err-msg">Dein '+service+'-Guthaben ist erschöpft. Bitte Guthaben aufladen um weiterzumachen.</div><div class="err-actions"><a class="err-btn pri" href="'+url+'" target="_blank">Guthaben aufladen ↗</a><button class="err-btn sec" onclick="this.closest(\'.err-card\').remove()">Schließen</button></div></div>';
+  const s1=document.getElementById('screen-1');
+  if(s1)s1.appendChild(card);
+  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+
 function fullReset(){
   if(!confirm('Alles zurücksetzen? Aktuelle Eingaben und Analyse werden gelöscht.'))return;
   // Clear inputs
@@ -2308,7 +2307,7 @@ function fullReset(){
   showToast('Zurückgesetzt ✓');
 }
 
-// ── Messenger Share Hint ───────────────────────────
+
 function handleMessengerShare(app){
   const isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
   if(!isPWA){
@@ -2331,8 +2330,6 @@ function handleMessengerShare(app){
 }
 
 
-
-// ── Run Analysis ──────────────────────────────────
 async function runAnalysis(){
   const old=document.getElementById('api-error-card');if(old)old.remove();
   if(S.tab==='audio'&&S.afiles.filter(f=>f.status==='p').length)await transcribeAll();
@@ -2368,6 +2365,7 @@ async function runAnalysis(){
     clearInterval(li);btn.disabled=false;btn.classList.remove('ld');lc.classList.remove('show');
   }
 }
+
 
 function renderAnalysis(r,msg){
   const srcMap={partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
@@ -2424,7 +2422,7 @@ function renderAnalysis(r,msg){
   document.getElementById('step-4').querySelector('.step-num').textContent=jn<=99?jn:'◎';
 }
 
-// ── Run Training ──────────────────────────────────
+
 async function runTraining(){
   const userResp=document.getElementById('userResp').value.trim();
   if(!userResp){showToast('Bitte eine Antwort schreiben.');return;}
@@ -2448,6 +2446,7 @@ async function runTraining(){
     document.getElementById('lsm-train').classList.remove('show');
   }
 }
+
 
 function renderTraining(r){
   // Self + Recv
@@ -2493,7 +2492,7 @@ function renderTraining(r){
   tr.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-// ── Copy / Share ──────────────────────────────────
+
 function copyCard(k){
   let txt='';
   if(k==='self'){document.querySelectorAll('#gSelf .gfk-txt').forEach((el,i)=>{const c=['Beobachtung','Gefühl','Bedürfnis','Bitte'];txt+=c[i]+': '+el.textContent+'\n';});}
@@ -2501,6 +2500,8 @@ function copyCard(k){
   else if(k==='sum')txt=document.getElementById('gSum').textContent;
   navigator.clipboard.writeText(txt).then(()=>showToast('Kopiert ✓'));
 }
+
+
 function copyAll(){
   const parts=[];
   document.querySelectorAll('#gSelf .gfk-txt').forEach((el,i)=>{const c=['Beobachtung','Gefühl','Bedürfnis','Bitte'];parts.push(c[i]+': '+el.textContent);});
@@ -2508,40 +2509,53 @@ function copyAll(){
   const s=document.getElementById('gSum').textContent;if(s)parts.push('\nZusammenfassung:\n'+s);
   navigator.clipboard.writeText(parts.join('\n')).then(()=>showToast('Alles kopiert ✓'));
 }
+
+
 function openShare(txt){
   document.getElementById('share-txt').textContent=txt;
   document.getElementById('shareOv').classList.add('open');
 }
+
+
 function closeShare(){document.getElementById('shareOv').classList.remove('open')}
+
+
 function copyShare(){navigator.clipboard.writeText(document.getElementById('share-txt').textContent).then(()=>showToast('Kopiert ✓'))}
+
+
 function svia(app){
   const txt=document.getElementById('share-txt').textContent,enc=encodeURIComponent(txt);
   const urls={whatsapp:`https://wa.me/?text=${enc}`,telegram:`https://t.me/share/url?url=&text=${enc}`,sms:`sms:?body=${enc}`,mail:`mailto:?body=${enc}&subject=Meine%20GFK-Antwort`,dating:'https://tinder.com/',ig:'https://www.instagram.com/direct/inbox/',signal:'https://signal.me/'};
   if(urls[app])window.open(urls[app],'_blank');
   if(['signal','dating','ig'].includes(app))navigator.clipboard.writeText(txt).then(()=>showToast('Kopiert — App öffnet sich ✓'));
 }
+
+
 function svNative(){
   const txt=document.getElementById('share-txt').textContent;
   if(navigator.share)navigator.share({text:txt}).catch(()=>{});
   else navigator.clipboard.writeText(txt).then(()=>showToast('Kopiert ✓'));
 }
 
-// ── Helpers ───────────────────────────────────────
+
 function loadChat(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>document.getElementById('chatIn').value=e.target.result;r.readAsText(f);}
+
+
 function newAnalysis(){S.lastGFK=null;S.transcripts=[];S.afiles=[];renderAList();renderTRs();document.getElementById('trainResults').style.display='none';goStep(1);}
+
+
 function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 
-// ── Journal / Verlauf ─────────────────────────────
-const JK='resonanz_journal';
-const SRC_LABELS={partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
-let jFilter='all';
 
 function loadJournalData(){
   try{return JSON.parse(localStorage.getItem(JK)||'[]');}catch{return[];}
 }
+
+
 function saveJournalData(entries){
   try{localStorage.setItem(JK,JSON.stringify(entries));}catch{showToast('Speicher voll — ältere Einträge löschen');}
 }
+
 
 function saveEntry(gfk,msg){
   const entries=loadJournalData();
@@ -2566,6 +2580,7 @@ function saveEntry(gfk,msg){
   // Update step-4 badge
   document.getElementById('step-4').querySelector('.step-num').textContent=entries.length<=99?entries.length:'◎';
 }
+
 
 function renderJournal(){
   const all=loadJournalData();
@@ -2626,22 +2641,29 @@ function renderJournal(){
   }).join('');
 }
 
+
 function toggleEntry(id){
   const el=document.getElementById('je_'+id);
   if(el)el.classList.toggle('open');
 }
+
+
 function filterJournal(btn,src){
   jFilter=src;
   document.querySelectorAll('.jfilter .chip').forEach(c=>c.classList.remove('act'));
   btn.classList.add('act');
   renderJournal();
 }
+
+
 function deleteEntry(id){
   const entries=loadJournalData().filter(e=>e.id!==id);
   saveJournalData(entries);
   renderJournal();
   showToast('Eintrag gelöscht');
 }
+
+
 function clearJournal(){
   if(!confirm('Alle Einträge löschen? Das kann nicht rückgängig gemacht werden.'))return;
   localStorage.removeItem(JK);
@@ -2649,6 +2671,8 @@ function clearJournal(){
   document.getElementById('step-4').querySelector('.step-num').textContent='◎';
   showToast('Verlauf gelöscht');
 }
+
+
 function exportJournal(){
   const entries=loadJournalData();
   if(!entries.length){showToast('Keine Einträge zum Exportieren');return;}
@@ -2659,6 +2683,8 @@ function exportJournal(){
   URL.revokeObjectURL(url);
   showToast('Export gestartet ✓');
 }
+
+
 function reloadEntry(id){
   const e=loadJournalData().find(x=>x.id===id);
   if(!e)return;
@@ -2668,12 +2694,16 @@ function reloadEntry(id){
   goStep(1);
   showToast('Eintrag geladen — erneut analysieren ✓');
 }
+
+
 function shareEntry(id){
   const e=loadJournalData().find(x=>x.id===id);
   if(!e)return;
   const txt=[e.feeling&&'Gefühl: '+e.feeling,e.need&&'Bedürfnis: '+e.need,e.response&&'\nMeine GFK-Antwort:\n'+e.response].filter(Boolean).join('\n');
   openShare(txt);
 }
+
+
 function calcStreak(entries){
   if(!entries.length)return 0;
   const today=new Date().toDateString();
@@ -2683,34 +2713,17 @@ function calcStreak(entries){
   return streak;
 }
 
-// ── Auto-save wired into renderAnalysis directly ──
-// (saveEntry called at end of renderAnalysis below)
-
-// ── Beziehungskarte ───────────────────────────────
-const MK='resonanz_map';
-const MAP_COLORS={
-  nourishing:{fill:'#4A9B7F',light:'rgba(74,155,127,.13)',text:'#2A6B54'},
-  challenging:{fill:'#C47B3A',light:'rgba(196,123,58,.13)',text:'#8A5520'},
-  draining:{fill:'#B05050',light:'rgba(176,80,80,.13)',text:'#7A2828'},
-  neutral:{fill:'#8A9890',light:'rgba(138,152,144,.1)',text:'#5A6860'}
-};
-const SRC_TO_KEY={partner:'partner',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
-
-let mapNodes=[];
-let mapNextId=1;
-let mapDragging=null,mapDragOX=0,mapDragOY=0;
-let mapSelected=null;
-let mapCvs,mapCtx,mapW=0,mapH=0,mapCX=0,mapCY=0;
-let mapReady=false;
 
 function loadMapNodes(){
   try{return JSON.parse(localStorage.getItem(MK)||'[]');}catch{return[];}
 }
+
+
 function saveMapNodes(){
   try{localStorage.setItem(MK,JSON.stringify(mapNodes));}catch{}
 }
 
-// Derive quality from journal entries for a source
+
 function deriveQuality(entries){
   if(!entries.length)return'neutral';
   const avgEnergy=entries.reduce((s,e)=>s+(e.energy||50),0)/entries.length;
@@ -2720,6 +2733,7 @@ function deriveQuality(entries){
   if(avgConflict>30||avgEnergy<45)return'challenging';
   return'nourishing';
 }
+
 
 function syncMapFromJournal(){
   const all=loadJournalData();
@@ -2770,6 +2784,7 @@ function syncMapFromJournal(){
   saveMapNodes();
 }
 
+
 function initMap(){
   if(mapReady)return;
   mapCvs=document.getElementById('map-canvas');
@@ -2778,6 +2793,7 @@ function initMap(){
   resizeMap();
   bindMapEvents();
 }
+
 
 function resizeMap(){
   if(!mapCvs)return;
@@ -2799,6 +2815,7 @@ function resizeMap(){
     }
   });
 }
+
 
 function drawMap(){
   if(!mapCtx)return;
@@ -2888,6 +2905,7 @@ function drawMap(){
   mapCtx.fillText('Ich',mapCX,mapCY);
 }
 
+
 function bindMapEvents(){
   function getMapPos(e){
     const rect=mapCvs.getBoundingClientRect();
@@ -2919,6 +2937,7 @@ function bindMapEvents(){
   });
 }
 
+
 function showMapDetail(n){
   const p=document.getElementById('mapDetail');
   const c=MAP_COLORS[n.quality];
@@ -2949,17 +2968,20 @@ function showMapDetail(n){
   p.style.display='block';
 }
 
+
 function deleteMapNode(id){
   mapNodes=mapNodes.filter(n=>n.id!==id);
   mapSelected=null;document.getElementById('mapDetail').style.display='none';
   saveMapNodes();drawMap();
 }
 
+
 function filterJournal4Map(src){
   goStep(4);
   const chip=[...document.querySelectorAll('.jfilter .chip')].find(c=>c.onclick&&c.getAttribute('onclick')&&c.getAttribute('onclick').includes("'"+src+"'"));
   if(chip){filterJournal(chip,src);}
 }
+
 
 function showMapAddPanel(editId){
   const p=document.getElementById('mapAddPanel');
@@ -2982,6 +3004,7 @@ function showMapAddPanel(editId){
   setTimeout(()=>document.getElementById('mp-name').focus(),50);
 }
 
+
 function saveMapNode(editId){
   const name=document.getElementById('mp-name').value.trim();if(!name)return;
   const quality=document.getElementById('mp-qual').value;
@@ -3001,6 +3024,7 @@ function saveMapNode(editId){
   saveMapNodes();drawMap();
 }
 
+
 function resetMapPositions(){
   mapNodes.forEach((n,i)=>{
     const dist=Math.min(mapCX,mapCY)*(.35+Math.random()*.42);
@@ -3009,6 +3033,7 @@ function resetMapPositions(){
   });
   saveMapNodes();drawMap();
 }
+
 
 function buildMapInsight(){
   const all=loadJournalData();
@@ -3040,6 +3065,7 @@ function buildMapInsight(){
   document.getElementById('mapInsight').innerHTML=insights.join(' ');
 }
 
+
 function openMapScreen(){
   if(!mapReady)initMap();
   else resizeMap();
@@ -3050,38 +3076,6 @@ function openMapScreen(){
   drawMap();
 }
 
-// ── Update goStep for step 5 ──────────────────────
-const _gsPrev=goStep;
-goStep=function(n){
-  if(n===5){
-    S.curStep=5;
-    document.querySelectorAll('.step').forEach((s,i)=>{s.classList.remove('act','done');if(i<4)s.classList.add('done');});
-    document.getElementById('step-5').classList.add('act');document.getElementById('step-5').classList.remove('done');
-    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
-    document.getElementById('screen-5').classList.add('act');
-    openMapScreen();window.scrollTo({top:0,behavior:'smooth'});return;
-  }
-  _gsPrev(n);
-};
-
-window.addEventListener('resize',()=>{if(S.curStep===5)resizeMap();});
-let deferredInstall=null;
-
-// Version bump — clears old dismissed flag so banner shows again
-const PWA_VERSION='v4-resonanz';
-if(localStorage.getItem('pwa_version')!==PWA_VERSION){
-  localStorage.removeItem('pwa_dismissed');
-  localStorage.setItem('pwa_version',PWA_VERSION);
-}
-
-window.addEventListener('beforeinstallprompt',e=>{
-  e.preventDefault();
-  deferredInstall=e;
-  // Show banner unless user explicitly dismissed this version
-  if(!localStorage.getItem('pwa_dismissed')){
-    document.getElementById('installBar').classList.add('show');
-  }
-});
 
 function doInstall(){
   if(!deferredInstall){
@@ -3098,16 +3092,14 @@ function doInstall(){
     dismissInstall();
   });
 }
+
+
 function dismissInstall(){
   document.getElementById('installBar').classList.remove('show');
   localStorage.setItem('pwa_dismissed','1');
 }
-window.addEventListener('appinstalled',()=>{
-  showToast('Resonanz installiert ✓');
-  document.getElementById('installBar').classList.remove('show');
-});
 
-// ── Apply incoming share data to UI ──────────────
+
 function applyPendingShare(){
   if(window.__pendingShareText){
     const txt=window.__pendingShareText;
@@ -3124,6 +3116,8 @@ function applyPendingShare(){
     showShareBanner('audio',files.length);
   }
 }
+
+
 function showShareBanner(type,count){
   let b=document.getElementById('share-recv-banner');
   if(!b){
@@ -3137,96 +3131,7 @@ function showShareBanner(type,count){
   b.innerHTML=`<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:15px;margin-left:4px">✕</button>`;
   setTimeout(()=>{if(b&&b.parentElement)b.remove();},5000);
 }
-setTimeout(()=>{
-  // Only apply share if gate is dismissed
-  const gate=document.getElementById('access-gate');
-  if(!gate||gate.style.display==='none'){
-    applyPendingShare();
-  } else {
-    // Wait for gate to be dismissed, then apply
-    const observer=new MutationObserver(()=>{
-      if(gate.style.display==='none'){
-        observer.disconnect();
-        applyPendingShare();
-      }
-    });
-    observer.observe(gate,{attributes:true,attributeFilter:['style']});
-  }
-},400);
-// Also re-check when SW signals completion
-if('serviceWorker' in navigator){
-  navigator.serviceWorker.addEventListener('message',e=>{
-    if(e.data&&e.data.type==='share-received')applyPendingShare();
-  });
-}
 
-// ── Check PWA status for messenger strip ─────────
-(function(){
-  const isPWA=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone;
-  if(!isPWA){
-    const hint=document.getElementById('share-install-hint');
-    if(hint)hint.style.display='block';
-  }
-})();
-
-
-// ── UI Language DE/EN ─────────────────────────────────────────
-const UI_LANG_KEY='resonanz_ui_lang';
-let uiLang=localStorage.getItem(UI_LANG_KEY)||'de';
-
-const T={
-  de:{
-    // Steps
-    step1:'Eingabe',step2:'Analyse',step3:'Training',step4:'Verlauf',step5:'Karte',
-    // Buttons
-    analyse:'✦ GFK-Analyse starten',transcribe:'Jetzt transkribieren',
-    training:'Training starten',reset:'Zurücksetzen',
-    // Input section
-    placeholder:'Nachricht hier eingeben…',
-    context:'Kontext (optional) — hilft der KI besser zu verstehen:',
-    from:'Diese Nachricht kommt von:',
-    audioTitle:'Audionachrichten auswählen',
-    audioSub:'Mehrere gleichzeitig möglich · MP3, M4A, WAV, OGG, OPUS · beliebige Länge',
-    chatPlaceholder:'WhatsApp/Telegram Chat-Export hier einfügen…',
-    // Chips
-    partner:'Partner·in',mother:'Mutter',father:'Vater',
-    friend:'Freund·in',colleague:'Kolleg·in',other:'Andere',
-    // Settings
-    settings:'Einstellungen',model:'KI-Modell',outputLang:'Ausgabe-Sprache',
-    modules:'Ausgabe-Module',audio:'Audio-Transkription',audioLang:'Sprache der Aufnahme',
-    done:'Fertig',
-    // Tabs
-    tabText:'Text',tabAudio:'Audio',tabChat:'Chat',
-    // Misc
-    noMsg:'Bitte zuerst eine Nachricht eingeben.',
-    saving:'Keys gespeichert 🔒',
-    unlock:'Keys entsperren',pin:'4-stellige PIN eingeben',
-    pinBtn:'Zugang öffnen →',
-    pinBack:'← Zur Startseite',
-  },
-  en:{
-    step1:'Input',step2:'Analysis',step3:'Training',step4:'Journal',step5:'Map',
-    analyse:'✦ Start NVC Analysis',transcribe:'Transcribe now',
-    training:'Start training',reset:'Reset',
-    placeholder:'Enter message here…',
-    context:'Context (optional) — helps the AI understand better:',
-    from:'This message is from:',
-    audioTitle:'Select voice messages',
-    audioSub:'Multiple at once · MP3, M4A, WAV, OGG, OPUS · any length',
-    chatPlaceholder:'Paste WhatsApp/Telegram chat export here…',
-    partner:'Partner',mother:'Mother',father:'Father',
-    friend:'Friend',colleague:'Colleague',other:'Other',
-    settings:'Settings',model:'AI Model',outputLang:'Output Language',
-    modules:'Output Modules',audio:'Audio Transcription',audioLang:'Recording language',
-    done:'Done',
-    tabText:'Text',tabAudio:'Audio',tabChat:'Chat',
-    noMsg:'Please enter a message first.',
-    saving:'Keys saved 🔒',
-    unlock:'Unlock keys',pin:'Enter 4-digit PIN',
-    pinBtn:'Open →',
-    pinBack:'← Back to home',
-  }
-};
 
 function applyUiLang(lang){
   uiLang=lang;
@@ -3307,9 +3212,10 @@ function applyUiLang(lang){
   document.documentElement.lang=lang;
 }
 
+
 function toggleUiLang(){applyUiLang(uiLang==='de'?'en':'de');}
 
-// ── Model quick-select ────────────────────────────────────────
+
 function toggleModelQuick(e){
   if(e)e.stopPropagation();
   const d=document.getElementById('modelQuick');
@@ -3324,6 +3230,7 @@ function toggleModelQuick(e){
     setTimeout(()=>document.addEventListener('click',close),50);
   }
 }
+
 
 function setModelQuick(id,lbl,type){
   setModel(id,lbl,type);
@@ -3342,17 +3249,86 @@ function setModelQuick(id,lbl,type){
   });
 }
 
-// ── Usage exhausted error ─────────────────────────────────────
-function showUsageError(service){
-  const old=document.getElementById('api-error-card');if(old)old.remove();
-  const url=service==='Anthropic'?'https://console.anthropic.com/settings/billing':'https://platform.openai.com/settings/billing';
-  const card=document.createElement('div');
-  card.id='api-error-card';card.className='err-card';
-  card.innerHTML='<div class="err-icon">⚡</div><div style="flex:1"><div class="err-title">Guthaben aufgebraucht</div><div class="err-msg">Dein '+service+'-Guthaben ist erschöpft. Bitte Guthaben aufladen um weiterzumachen.</div><div class="err-actions"><a class="err-btn pri" href="'+url+'" target="_blank">Guthaben aufladen ↗</a><button class="err-btn sec" onclick="this.closest(\'.err-card\').remove()">Schließen</button></div></div>';
-  const s1=document.getElementById('screen-1');
-  if(s1)s1.appendChild(card);
-  card.scrollIntoView({behavior:'smooth',block:'nearest'});
+
+function buildScreenshotPrompt(ctx){
+  const lang = S.outputLang||'de';
+  const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ru:'Отвечай на русском языке.'};
+  const langInstr = langMap[lang]||'Respond in '+lang+'.';
+  const isDetailed = S.gfkDetail==='detailed';
+  const ctxPart = ctx ? '\nKontext: '+ctx : '';
+  const src = {partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'}[S.src]||'einer anderen Person';
+
+  if(isDetailed){
+    return `You are an empathetic NVC coach. ${langInstr} Analyze the conversation screenshot(s) provided.${ctxPart}
+
+The screenshot shows a conversation with ${src}. Read all visible text carefully, then provide a deep NVC analysis.
+
+Reply ONLY with valid JSON:
+{
+  "transcript": "Full text you can read from the screenshot(s), formatted as conversation",
+  "self": {
+    "observation": "What was factually said/written, without interpretation",
+    "feeling": "The main feeling triggered by this conversation",
+    "need": "The core universal need behind this feeling",
+    "need_context": "Why this need matters in this relationship",
+    "request": "One concrete thing I could do or ask right now",
+    "old_pattern": "What old wound or pattern might this activate?"
+  },
+  "response": "Warm NVC response to send (3-5 sentences)",
+  "response_tip": "Specific tip for tone or timing",
+  "summary": "3-4 sentence neutral summary of the dynamic",
+  "communication_pattern": "Name the visible communication pattern",
+  "relationship_insight": "One deeper insight about this relationship",
+  "tags": ["tag1","tag2","tag3"],
+  "triggers": [{"phrase":"exact phrase","explanation":"what wound does this activate?","somatic":"possible body sensation"}],
+  "growth_impulse": "One thing to practice or reflect on"
+}`;
+  }
+
+  return `You are an empathetic NVC coach. ${langInstr} Analyze the conversation screenshot(s).${ctxPart}
+
+The screenshot shows a message from ${src}. Read the visible text and provide a concise NVC analysis.
+
+Reply ONLY with valid JSON:
+{
+  "transcript": "Text visible in the screenshot (formatted as conversation)",
+  "self": {
+    "observation": "What was factually written (one sentence)",
+    "feeling": "Main feeling this triggers",
+    "need": "Core human need behind this",
+    "request": "One concrete thing to do or ask"
+  },
+  "response": "Warm NVC response to send (2-3 sentences)",
+  "summary": "2-3 sentence neutral summary",
+  "tags": ["tag1","tag2"],
+  "triggers": [{"phrase":"most triggering phrase","explanation":"brief explanation"}]
+}`;
 }
+
+
+function buildTrainPrompt(origMsg,gfk,userResp,ctx){
+  const lang=S.outputLang||'de';
+  const langInstr=lang==='de'?'Antworte auf Deutsch.'
+    :lang==='en'?'Respond in English.'
+    :lang==='es'?'Responde en español.'
+    :lang==='fr'?'Réponds en français.'
+    :lang==='it'?'Rispondi in italiano.'
+    :lang==='tr'?'Türkçe yanıt ver.'
+    :lang==='ar'?'أجب باللغة العربية.'
+    :lang==='ru'?'Отвечай на русском языке.'
+    :lang==='zh'?'用中文回答。'
+    :lang==='ja'?'日本語で回答してください。'
+    :lang==='pt'?'Responda em português.'
+    :lang==='nl'?'Antwoord in het Nederlands.'
+    :`Respond in ${S.outputLangName||lang}.`;
+  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"short label","text":"what this response reveals about the user"}],"recipientPerspective":[{"icon":"emoji","label":"short label","text":"how it lands with the other person"}],"values":[{"name":"value name","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"short title","description":"short description"},"alternatives":[{"strategy":"name","effect":"short","text":"concrete response","tradeoff":"gain/loss"}],"pattern":"communication pattern described warmly","growth":"concrete growth impulse"}`;
+}
+
+
+
+
+
+
 
 (function(){applyUiLang(uiLang);})();
 (function(){checkProStatus();showFreeUsageIndicator();})();
@@ -3373,6 +3349,7 @@ function showUsageError(service){
   const n=loadJournalData().length;
   if(n>0)document.getElementById('step-4').querySelector('.step-num').textContent=n<=99?n:'◎';
 })();
+
 </script>
 </body>
 </html>
