@@ -1044,6 +1044,16 @@ if(existingToken) {
             <!-- Preview -->
             <div id="screenshot-list" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
             <!-- Hint -->
+            <!-- Transcribe button - same pattern as audio -->
+            <div id="screenshot-btn-row" style="display:flex;align-items:center;gap:10px;margin-top:10px">
+              <button class="btn btn-ghost" id="screenshotTranscribeBtn" onclick="transcribeScreenshots()"
+                style="font-size:13px;padding:8px 16px">
+                <span class="bi">📷 Text erkennen & analysieren</span><div class="spin"></div>
+              </button>
+              <span style="font-size:12px;color:var(--txs)" id="screenshot-hint"></span>
+            </div>
+            <!-- Transcript result area -->
+            <div id="screenshot-transcript-area"></div>
             <div style="font-size:11px;color:var(--txs);margin-top:8px;text-align:center">Der Bildinhalt wird an die KI gesendet — nur für die Analyse, nie gespeichert</div>
           </div>
         </div>
@@ -1326,7 +1336,6 @@ const S={
   afiles:[],transcripts:[],popWord:null,
   lastGFK:null,curStep:1
 };
-let screenshots = []; // screenshot files for image analysis
 // ── Constants & State ────────────────────────────
 const KEY_STORE = 'resonanz_keys_v1';
 const SETTINGS_KEY = 'resonanz_settings_v1';
@@ -1469,7 +1478,7 @@ function saveSettings(){
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
       model: S.model,
       mtype: S.mtype,
-      modelLabel: (document.getElementById('plbl')?.textContent||'Claude Sonnet').replace(/\s*(PRO|✦|Pro).*$/,'').trim(),
+      modelLabel: document.getElementById('plbl')?.textContent || 'Claude Sonnet',
       outputLang: S.outputLang,
       outputLangName: S.outputLangName,
       outputLangFlag: S.outputLangFlag,
@@ -1491,7 +1500,7 @@ function loadSettings(){
 
     // Model
     if(p.model){
-      setModel(p.model, (p.modelLabel||p.model).replace(/\s*(PRO|✦|Pro).*$/,'').trim(), p.mtype||'cloud');
+      setModel(p.model, p.modelLabel||p.model, p.mtype||'cloud');
       // Sync settings drawer
       document.querySelectorAll('#model-opts .mopt').forEach(o=>{
         o.classList.remove('sel'); o.style.background='';
@@ -2033,8 +2042,11 @@ function getText(){
   if(S.tab==='audio'){
     if(!S.transcripts.length)return '';
     if(S.transcripts.length===1)return S.transcripts[0].text;
-    // Multiple files: label each and combine
     return S.transcripts.map((t,i)=>`[Nachricht ${i+1} – ${t.name}]:\n${t.text}`).join('\n\n');
+  }
+  if(S.tab==='screenshot'){
+    if(S._screenshotTranscript)return S._screenshotTranscript;
+    return screenshots.length ? '[SCREENSHOT_ANALYSIS]' : '';
   }
   return'';
 }
@@ -2148,6 +2160,12 @@ function addScreenshots(files){
     reader.onload = e => {
       screenshots.push({name:file.name,size:file.size,dataUrl:e.target.result,file});
       renderScreenshots();
+      // Clear old transcript when new images added
+      S._screenshotTranscript = null;
+      const hint=document.getElementById('screenshot-hint');
+      if(hint)hint.textContent='';
+      const area=document.getElementById('screenshot-transcript-area');
+      if(area)area.innerHTML='';
     };
     reader.readAsDataURL(file);
   });
@@ -2286,7 +2304,7 @@ function fullReset(){
   document.getElementById('ctxIn').value='';
   document.getElementById('userResp').value='';
   // Clear audio
-  S.afiles=[];S.transcripts=[];screenshots=[];renderAList();renderTRs();renderScreenshots();
+  S.afiles=[];S.transcripts=[];screenshots=[];S._screenshotTranscript=null;renderAList();renderTRs();renderScreenshots();const scArea=document.getElementById('screenshot-transcript-area');if(scArea)scArea.innerHTML='';
   // Clear analysis
   S.lastGFK=null;
   // Clear training
@@ -2341,6 +2359,11 @@ async function runAnalysis(){
   if(S.tab==='screenshot'){
     if(!S.isPro){openProUpgrade();return;}
     if(!screenshots.length){showToast('Bitte zuerst ein Screenshot hochladen.');return;}
+    // Auto-transcribe if not done yet
+    if(!S._screenshotTranscript){
+      await transcribeScreenshots();
+      if(!S._screenshotTranscript)return; // transcription failed
+    }
   }
   const ctx=document.getElementById('ctxIn').value.trim();
 
@@ -3251,6 +3274,87 @@ function setModelQuick(id,lbl,type){
 }
 
 
+
+// ── Screenshot Transcription ──────────────────────
+async function transcribeScreenshots(){
+  if(!screenshots.length){
+    showToast('Bitte zuerst Screenshots hochladen.');
+    return;
+  }
+  const btn = document.getElementById('screenshotTranscribeBtn');
+  const hint = document.getElementById('screenshot-hint');
+  const area = document.getElementById('screenshot-transcript-area');
+  if(btn){btn.disabled=true;btn.classList.add('ld');}
+  if(hint)hint.textContent='Erkenne Text…';
+  if(area)area.innerHTML='';
+
+  try {
+    // Build OCR prompt
+    const lang = S.outputLang || 'de';
+    const langMap = {de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ru:'Отвечай на русском.'};
+    const langInstr = langMap[lang] || 'Respond in '+lang+'.';
+
+    const ocrPrompt = `${langInstr} Please extract and transcribe ALL text visible in this screenshot exactly as written. Format it as a conversation with line breaks. If multiple messages are visible, separate them clearly. Do not analyze yet — just transcribe the text faithfully. Reply with ONLY the transcribed text, no explanation.`;
+
+    const res = await fetch(BACKEND+'/api/analyse', {
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-resonanz-token': localStorage.getItem('resonanz_token_v1')||''
+      },
+      body: JSON.stringify({
+        prompt: ocrPrompt,
+        model: S.model,
+        images: screenshots.map(sc=>sc.dataUrl)
+      })
+    });
+
+    if(!res.ok){
+      const e = await res.json().catch(()=>({}));
+      throw new Error(e.error || 'Fehler beim Transkribieren');
+    }
+    const data = await res.json();
+    const transcript = data.result || '';
+
+    if(!transcript.trim()){
+      throw new Error('Kein Text erkannt — ist Text im Screenshot sichtbar?');
+    }
+
+    // Show transcript in area
+    if(area){
+      area.innerHTML = `
+        <div style="background:var(--sur2);border-radius:12px;padding:12px 14px;margin-top:10px;border:.5px solid var(--bds)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--txs)">📷 Erkannter Text</div>
+            <button onclick="copyScreenshotTranscript()" style="font-size:11px;padding:3px 8px;border-radius:6px;border:.5px solid var(--bds);background:none;color:var(--txs);cursor:pointer">Kopieren</button>
+          </div>
+          <div id="sc-transcript-text" style="font-size:13px;color:var(--tx);line-height:1.7;white-space:pre-wrap">${transcript.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+          <div style="margin-top:10px;font-size:12px;color:var(--txs)">Text erkannt — jetzt GFK-Analyse starten:</div>
+        </div>`;
+    }
+
+    // Put transcript into msgIn so GFK analysis uses it
+    const msgIn = document.getElementById('msgIn');
+    if(msgIn) msgIn.value = transcript;
+    // Store for analysis
+    S._screenshotTranscript = transcript;
+
+    if(hint)hint.textContent = '✓ Text erkannt';
+    showToast('Text erkannt ✓ — GFK-Analyse starten');
+
+  } catch(err){
+    if(hint)hint.textContent = err.message || 'Fehler';
+    showAPIError(err.message);
+  } finally {
+    if(btn){btn.disabled=false;btn.classList.remove('ld');}
+  }
+}
+
+function copyScreenshotTranscript(){
+  const el = document.getElementById('sc-transcript-text');
+  if(el) navigator.clipboard.writeText(el.textContent).then(()=>showToast('Kopiert ✓'));
+}
+
 function buildScreenshotPrompt(ctx){
   const lang = S.outputLang||'de';
   const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ru:'Отвечай на русском языке.'};
@@ -3335,20 +3439,6 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
 (function(){checkProStatus();showFreeUsageIndicator();})();
 
 // ── Init: load persisted settings ───────────────
-
-// ── One-time: clean bad modelLabel from settings ──
-(function(){
-  try{
-    const raw=localStorage.getItem(SETTINGS_KEY);
-    if(!raw)return;
-    const p=JSON.parse(raw);
-    if(p.modelLabel&&/PRO|✦/.test(p.modelLabel)){
-      p.modelLabel=p.modelLabel.replace(/\s*(PRO|✦|Pro).*$/,'').trim();
-      localStorage.setItem(SETTINGS_KEY,JSON.stringify(p));
-    }
-  }catch(e){}
-})();
-
 (function(){ loadSettings(); })();
 
 // ── Init: load saved keys ────────────────────────
