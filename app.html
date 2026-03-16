@@ -2178,43 +2178,6 @@ Reply ONLY with valid JSON:
 }`;
 }
 
-
-  // Simple mode — structured but concise
-  return `You are an empathetic NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
-
-Reply ONLY with valid JSON, no markdown:
-{
-  "self": {
-    "observation": "What was factually said or done (one sentence, no interpretation)",
-    "feeling": "The main feeling this likely triggers in the receiver",
-    "need": "The core human need behind this feeling",
-    "request": "One concrete thing I could do or ask for right now"
-  },
-  "response": "A warm, clear NVC response to send (2-3 sentences)",
-  "summary": "2-3 sentence neutral summary of what is really being communicated",
-  "tags": ["tag1","tag2"],
-  "triggers": [{"phrase":"most triggering phrase","explanation":"brief explanation"}]
-}`;
-}`;
-  } else {
-    return `You are a warm NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
-
-Reply ONLY with valid JSON, no markdown.
-
-{
-  "self": {
-    "observation": "What was actually said/done (factual, no judgment)",
-    "feeling": "The feeling this message likely expresses",
-    "need": "The underlying universal human need",
-    "request": "A simple request I could make of myself"
-  },
-  "response": "A warm, empathetic NVC response to send (2-3 sentences)",
-  "summary": "Neutral summary in 2-3 clear sentences",
-  "tags": ["tag1", "tag2"],
-  "triggers": [{"phrase": "triggering phrase", "explanation": "why this triggers a reaction"}]
-}`;
-  }
-}
 function buildTrainPrompt(origMsg,gfk,userResp,ctx){
   const lang=S.outputLang||'de';
   const langInstr=lang==='de'?'Antworte auf Deutsch.'
