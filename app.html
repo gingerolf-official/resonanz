@@ -573,13 +573,7 @@ async function checkCode(){
     if (r.ok && d.token) {
       // localStorage = persists across app restarts and share-button opens
       localStorage.setItem(GATE_KEY, d.token);
-      if(d.pro || (d.token && d.token.startsWith('pro_'))){
-        localStorage.setItem('resonanz_pro_v1','1');
-      } else {
-        localStorage.removeItem('resonanz_pro_v1');
-      }
       dismissGate();
-      showToast(d.pro ? '✦ Pro-Zugang aktiv' : 'Willkommen ✓');
     } else {
       err.textContent = d.error || 'Ungültiger Code';
       input.value = '';
@@ -594,21 +588,8 @@ async function checkCode(){
 }
 
 function dismissGate(){
-  const gate=document.getElementById('access-gate');
-  if(gate)gate.style.display='none';
-  // Re-check pro status now that token is stored
-  checkProStatus();
-  // Update pro badge in model dropdown if pro
-  if(S.isPro){
-    const pill=document.getElementById('mpill');
-    if(pill&&!pill.querySelector('.pro-badge')){
-      const badge=document.createElement('span');
-      badge.className='pro-badge';
-      badge.style.cssText='font-size:9px;padding:1px 4px;margin-left:3px';
-      badge.textContent='PRO';
-      pill.appendChild(badge);
-    }
-  }
+  const gate = document.getElementById('access-gate');
+  if(gate) gate.style.display = 'none';
 }
 
 // Show gate only if no valid token stored
@@ -1058,7 +1039,7 @@ if(existingToken) {
               <div style="font-size:2rem;margin-bottom:8px">📷</div>
               <div style="font-size:14px;font-weight:500;color:var(--tx);margin-bottom:4px">Screenshot hochladen</div>
               <div style="font-size:12px;color:var(--txs)">WhatsApp · iMessage · Telegram · Dating-Apps · E-Mail<br>JPG, PNG, WEBP — max 10 MB</div>
-              <input type="file" id="screenshotIn" accept="image/*" multiple style="display:none" onchange="addScreenshots(this.files)" onclick="event.stopPropagation()">
+              <input type="file" id="screenshotIn" accept="image/*" multiple style="display:none" onchange="addScreenshots(this.files)">
             </div>
             <!-- Preview -->
             <div id="screenshot-list" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
@@ -1345,6 +1326,7 @@ const S={
   afiles:[],transcripts:[],popWord:null,
   lastGFK:null,curStep:1
 };
+let screenshots = []; // screenshot files for image analysis
 // ── Constants & State ────────────────────────────
 const KEY_STORE = 'resonanz_keys_v1';
 const SETTINGS_KEY = 'resonanz_settings_v1';
@@ -1487,7 +1469,7 @@ function saveSettings(){
     localStorage.setItem(SETTINGS_KEY, JSON.stringify({
       model: S.model,
       mtype: S.mtype,
-      modelLabel: document.getElementById('plbl')?.textContent || 'Claude Sonnet',
+      modelLabel: (document.getElementById('plbl')?.textContent||'Claude Sonnet').replace(/\s*(PRO|✦|Pro).*$/,'').trim(),
       outputLang: S.outputLang,
       outputLangName: S.outputLangName,
       outputLangFlag: S.outputLangFlag,
@@ -1509,7 +1491,7 @@ function loadSettings(){
 
     // Model
     if(p.model){
-      setModel(p.model, p.modelLabel||p.model, p.mtype||'cloud');
+      setModel(p.model, (p.modelLabel||p.model).replace(/\s*(PRO|✦|Pro).*$/,'').trim(), p.mtype||'cloud');
       // Sync settings drawer
       document.querySelectorAll('#model-opts .mopt').forEach(o=>{
         o.classList.remove('sel'); o.style.background='';
@@ -2059,10 +2041,13 @@ function getText(){
 
 
 function checkProStatus(){
-  if(localStorage.getItem(PRO_KEY)==='1'){S.isPro=true;return;}
-  const token=localStorage.getItem('resonanz_token_v1');
-  if(token&&token.startsWith('pro_')){S.isPro=true;localStorage.setItem(PRO_KEY,'1');return;}
-  S.isPro=false;
+  // Pro = access code that starts with PRO- OR stored pro flag
+  const stored = localStorage.getItem(PRO_KEY);
+  if(stored === '1') { S.isPro = true; return; }
+  // Also check if gate token was from a PRO code (set by auth backend)
+  const token = localStorage.getItem('resonanz_token_v1');
+  if(token && token.startsWith('pro_')) { S.isPro = true; localStorage.setItem(PRO_KEY,'1'); return; }
+  S.isPro = false;
 }
 
 
@@ -2100,22 +2085,9 @@ function showProWall(feature){
 
 
 function openProUpgrade(){
-  const old=document.getElementById('pro-upgrade-ov');if(old)old.remove();
-  const ov=document.createElement('div');
-  ov.id='pro-upgrade-ov';
-  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:8000;display:flex;align-items:center;justify-content:center;padding:20px';
-  ov.innerHTML='<div style="background:var(--sur);border-radius:20px;padding:28px 24px;max-width:360px;width:100%;text-align:center"><div style="font-size:2rem;margin-bottom:8px">✦</div><div style="font-size:17px;font-weight:500;color:var(--p);margin-bottom:4px">Resonanz Pro</div><div style="font-size:13px;color:var(--txs);line-height:1.6;margin-bottom:20px">Schalte alle Features frei:<br>Unbegrenzte Audio-Transkription,<br>Screenshot-Analyse, detaillierte GFK-Analyse,<br>Training &amp; Beziehungskarte.</div><div style="background:var(--sur2);border-radius:12px;padding:12px 16px;margin-bottom:16px;text-align:left"><div style="font-size:12px;font-weight:500;color:var(--p);margin-bottom:6px">So wirst du Pro:</div><div style="font-size:12px;color:var(--txs);line-height:2">1. Pro-Zugangscode erhalten (beginnt mit <code style="background:rgba(42,71,64,.1);padding:1px 5px;border-radius:4px">PRO-</code>)<br>2. Unten auf Neu einloggen klicken<br>3. Pro-Code eingeben</div></div><div style="display:flex;gap:8px"><button onclick="document.getElementById(\'pro-upgrade-ov\').remove()" style="flex:1;padding:10px;border-radius:10px;border:.5px solid var(--bds);background:none;color:var(--txs);font-size:13px;cursor:pointer;font-family:inherit">Schließen</button><button onclick="document.getElementById(\'pro-upgrade-ov\').remove();logoutGate()" style="flex:1;padding:10px;border-radius:10px;background:linear-gradient(135deg,#9A7A46,#C4943A);color:white;border:none;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit">Neu einloggen →</button></div></div>';
-  document.body.appendChild(ov);
-  ov.addEventListener('click',e=>{if(e.target===ov)ov.remove();});
-}
-function logoutGate(){
-  localStorage.removeItem('resonanz_token_v1');
-  localStorage.removeItem('resonanz_pro_v1');
-  S.isPro=false;
-  const gate=document.getElementById('access-gate');
-  if(gate){gate.style.display='flex';}
-  const inp=document.getElementById('gate-input');
-  if(inp){inp.value='';setTimeout(()=>inp.focus(),100);}
+  // For now: show info overlay
+  showToast('Pro-Version: Zugangscode mit PRO- Prefix verwenden');
+  openSettings();
 }
 
 
@@ -2314,7 +2286,7 @@ function fullReset(){
   document.getElementById('ctxIn').value='';
   document.getElementById('userResp').value='';
   // Clear audio
-  S.afiles=[];S.transcripts=[];renderAList();renderTRs();
+  S.afiles=[];S.transcripts=[];screenshots=[];renderAList();renderTRs();renderScreenshots();
   // Clear analysis
   S.lastGFK=null;
   // Clear training
@@ -3363,6 +3335,20 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
 (function(){checkProStatus();showFreeUsageIndicator();})();
 
 // ── Init: load persisted settings ───────────────
+
+// ── One-time: clean bad modelLabel from settings ──
+(function(){
+  try{
+    const raw=localStorage.getItem(SETTINGS_KEY);
+    if(!raw)return;
+    const p=JSON.parse(raw);
+    if(p.modelLabel&&/PRO|✦/.test(p.modelLabel)){
+      p.modelLabel=p.modelLabel.replace(/\s*(PRO|✦|Pro).*$/,'').trim();
+      localStorage.setItem(SETTINGS_KEY,JSON.stringify(p));
+    }
+  }catch(e){}
+})();
+
 (function(){ loadSettings(); })();
 
 // ── Init: load saved keys ────────────────────────
