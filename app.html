@@ -519,6 +519,15 @@ audio{width:100%;height:28px;margin-top:6px}
 .free-limit-bar{height:4px;background:var(--sur2);border-radius:2px;margin-top:4px;overflow:hidden}
 .free-limit-fill{height:100%;border-radius:2px;background:var(--p);transition:width .3s}
 
+
+/* ── Screenshot Tab ── */
+.sc-item{background:var(--sur);border:.5px solid var(--bds);border-radius:12px;padding:10px;display:flex;gap:10px;align-items:center}
+.sc-thumb{width:56px;height:56px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.sc-name{font-size:13px;font-weight:500;color:var(--tx);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.sc-size{font-size:11px;color:var(--txs)}
+.sc-del{margin-left:auto;background:none;border:none;color:var(--txs);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px}
+.sc-del:hover{background:var(--sur2);color:var(--acc)}
+
 </style>
 </head>
 <body>
@@ -975,6 +984,7 @@ if(existingToken) {
             <button class="itab act" onclick="switchITab('text',this)">✦ Text</button>
             <button class="itab" onclick="switchITab('audio',this)">◎ Audio</button>
             <button class="itab" onclick="switchITab('chat',this)">⊞ Chat</button>
+            <button class="itab" onclick="switchITab('screenshot',this)">📷 Bild <span class="pro-badge" style="font-size:9px;padding:1px 5px">PRO</span></button>
           </div>
 
           <!-- Text -->
@@ -1008,6 +1018,33 @@ if(existingToken) {
               <input type="file" id="chatFile" accept=".txt" style="display:none" onchange="loadChat(this)">
               <span style="font-size:11.5px;color:var(--txs)">WhatsApp → Mehr → Chat exportieren</span>
             </div>
+          </div>
+          <!-- Screenshot -->
+          <div id="itab-screenshot" style="display:none">
+            <!-- Pro gate -->
+            <div id="screenshot-pro-gate" style="display:none">
+              <div class="pro-wall" style="margin:0">
+                <div class="pro-wall-icon">📷</div>
+                <div class="pro-wall-title">Screenshot-Analyse <span class="pro-badge">PRO</span></div>
+                <div class="pro-wall-sub">Lade Screenshots aus WhatsApp, iMessage oder anderen Apps hoch. Resonanz Pro liest den Text, erkennt Gefühle und liefert eine GFK-Analyse.</div>
+                <button class="pro-wall-btn" onclick="openProUpgrade()">Pro freischalten</button>
+              </div>
+            </div>
+            <!-- Drop zone -->
+            <div id="screenshot-drop" onclick="document.getElementById('screenshotIn').click()"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="doScreenshotDrop(event)"
+              style="border:1.5px dashed var(--bds);border-radius:16px;padding:28px 20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--sur)">
+              <div style="font-size:2rem;margin-bottom:8px">📷</div>
+              <div style="font-size:14px;font-weight:500;color:var(--tx);margin-bottom:4px">Screenshot hochladen</div>
+              <div style="font-size:12px;color:var(--txs)">WhatsApp · iMessage · Telegram · Dating-Apps · E-Mail<br>JPG, PNG, WEBP — max 10 MB</div>
+              <input type="file" id="screenshotIn" accept="image/*" multiple style="display:none" onchange="addScreenshots(this.files)">
+            </div>
+            <!-- Preview -->
+            <div id="screenshot-list" style="display:flex;flex-direction:column;gap:8px;margin-top:10px"></div>
+            <!-- Hint -->
+            <div style="font-size:11px;color:var(--txs);margin-top:8px;text-align:center">Der Bildinhalt wird an die KI gesendet — nur für die Analyse, nie gespeichert</div>
           </div>
         </div>
       </div>
@@ -1646,11 +1683,7 @@ function goStep(n){
 }
 
 // ── Input tabs ─────────────────────────────────────
-function switchITab(t,btn){
-  ['text','audio','chat'].forEach(id=>document.getElementById('itab-'+id).style.display=id===t?'':'none');
-  document.querySelectorAll('.itab').forEach(b=>b.classList.remove('act'));
-  btn.classList.add('act');S.tab=t;
-}
+
 
 // ── Source chips ──────────────────────────────────
 function setSrc(el,v){
@@ -1970,7 +2003,93 @@ function showFreeUsageIndicator(){
   indicator.querySelector('.free-limit-fill').style.width = ((used/FREE_AUDIO_LIMIT)*100) + '%';
 }
 
+
+// ── Screenshot Analysis ──────────────────────────────
+let screenshots = []; // [{name, size, dataUrl, file}]
+
+function switchITab(name, el){
+  // Check pro gate for screenshot
+  if(name === 'screenshot'){
+    if(!S.isPro){
+      S.tab = 'screenshot';
+      document.querySelectorAll('.itab').forEach(t=>t.classList.remove('act'));
+      if(el)el.classList.add('act');
+      document.querySelectorAll('[id^="itab-"]').forEach(t=>t.style.display='none');
+      document.getElementById('itab-screenshot').style.display='';
+      document.getElementById('screenshot-pro-gate').style.display='block';
+      document.getElementById('screenshot-drop').style.display='none';
+      document.getElementById('screenshot-list').style.display='none';
+      return;
+    } else {
+      document.getElementById('screenshot-pro-gate').style.display='none';
+      document.getElementById('screenshot-drop').style.display='';
+      document.getElementById('screenshot-list').style.display='flex';
+    }
+  }
+  S.tab = name;
+  document.querySelectorAll('.itab').forEach(t=>t.classList.remove('act'));
+  if(el)el.classList.add('act');
+  document.querySelectorAll('[id^="itab-"]').forEach(t=>t.style.display='none');
+  const target = document.getElementById('itab-'+name);
+  if(target)target.style.display='';
+}
+
+function doScreenshotDrop(e){
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag');
+  const files = [...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/'));
+  if(files.length) addScreenshots(files);
+}
+
+function addScreenshots(files){
+  [...files].forEach(file=>{
+    if(file.size > 10*1024*1024){showToast('Max 10 MB pro Bild');return;}
+    const reader = new FileReader();
+    reader.onload = e => {
+      screenshots.push({name:file.name,size:file.size,dataUrl:e.target.result,file});
+      renderScreenshots();
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeScreenshot(idx){
+  screenshots.splice(idx,1);
+  renderScreenshots();
+}
+
+function renderScreenshots(){
+  const list = document.getElementById('screenshot-list');
+  if(!screenshots.length){list.innerHTML='';return;}
+  list.innerHTML = screenshots.map((sc,i)=>`
+    <div class="sc-item">
+      <img class="sc-thumb" src="${sc.dataUrl}" alt="${sc.name}">
+      <div style="flex:1;min-width:0">
+        <div class="sc-name">${sc.name}</div>
+        <div class="sc-size">${(sc.size/1024).toFixed(0)} KB</div>
+      </div>
+      <button class="sc-del" onclick="removeScreenshot(${i})">✕</button>
+    </div>`).join('');
+}
+
+function getScreenshotData(){
+  return screenshots.map(sc=>sc.dataUrl);
+}
+
+// Override getText to handle screenshot tab
+const _getTextOrig = getText;
+getText = function(){
+  if(S.tab === 'screenshot'){
+    return screenshots.length ? '[SCREENSHOT_ANALYSIS]' : '';
+  }
+  return _getTextOrig();
+};
+
 function buildGFKPrompt(msg, ctx){
+  // Screenshot mode — different prompt
+  if(S.tab==='screenshot'){
+    return buildScreenshotPrompt(ctx);
+  }
   const srcMap={partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'};
   const lang=S.outputLang||'de';
   const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ar:'أجب باللغة العربية.',ru:'Отвечай на русском языке.',zh:'用中文回答。',ja:'日本語で回答してください。',pt:'Responda em português.',nl:'Antwoord in het Nederlands.'};
@@ -2003,6 +2122,62 @@ Reply ONLY with valid JSON, no markdown:
   "growth_impulse": "One concrete thing to practice or reflect on"
 }`;
   }
+
+function buildScreenshotPrompt(ctx){
+  const lang = S.outputLang||'de';
+  const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ru:'Отвечай на русском языке.'};
+  const langInstr = langMap[lang]||'Respond in '+lang+'.';
+  const isDetailed = S.gfkDetail==='detailed';
+  const ctxPart = ctx ? '\nKontext: '+ctx : '';
+  const src = {partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'}[S.src]||'einer anderen Person';
+
+  if(isDetailed){
+    return `You are an empathetic NVC coach. ${langInstr} Analyze the conversation screenshot(s) provided.${ctxPart}
+
+The screenshot shows a conversation with ${src}. Read all visible text carefully, then provide a deep NVC analysis.
+
+Reply ONLY with valid JSON:
+{
+  "transcript": "Full text you can read from the screenshot(s), formatted as conversation",
+  "self": {
+    "observation": "What was factually said/written, without interpretation",
+    "feeling": "The main feeling triggered by this conversation",
+    "need": "The core universal need behind this feeling",
+    "need_context": "Why this need matters in this relationship",
+    "request": "One concrete thing I could do or ask right now",
+    "old_pattern": "What old wound or pattern might this activate?"
+  },
+  "response": "Warm NVC response to send (3-5 sentences)",
+  "response_tip": "Specific tip for tone or timing",
+  "summary": "3-4 sentence neutral summary of the dynamic",
+  "communication_pattern": "Name the visible communication pattern",
+  "relationship_insight": "One deeper insight about this relationship",
+  "tags": ["tag1","tag2","tag3"],
+  "triggers": [{"phrase":"exact phrase","explanation":"what wound does this activate?","somatic":"possible body sensation"}],
+  "growth_impulse": "One thing to practice or reflect on"
+}`;
+  }
+
+  return `You are an empathetic NVC coach. ${langInstr} Analyze the conversation screenshot(s).${ctxPart}
+
+The screenshot shows a message from ${src}. Read the visible text and provide a concise NVC analysis.
+
+Reply ONLY with valid JSON:
+{
+  "transcript": "Text visible in the screenshot (formatted as conversation)",
+  "self": {
+    "observation": "What was factually written (one sentence)",
+    "feeling": "Main feeling this triggers",
+    "need": "Core human need behind this",
+    "request": "One concrete thing to do or ask"
+  },
+  "response": "Warm NVC response to send (2-3 sentences)",
+  "summary": "2-3 sentence neutral summary",
+  "tags": ["tag1","tag2"],
+  "triggers": [{"phrase":"most triggering phrase","explanation":"brief explanation"}]
+}`;
+}
+
 
   // Simple mode — structured but concise
   return `You are an empathetic NVC (Nonviolent Communication) coach. ${langInstr} Analyze this message clearly and concisely.${ctxPart}${msgPart}
@@ -2091,7 +2266,11 @@ async function callAPI(prompt){
       'Content-Type':'application/json',
       'x-resonanz-token': localStorage.getItem('resonanz_token_v1')||''
     },
-    body:JSON.stringify({prompt,model:modelMap[S.model]||S.model})
+    body:JSON.stringify({
+      prompt,
+      model:modelMap[S.model]||S.model,
+      images: S.tab==='screenshot' ? getScreenshotData() : undefined
+    })
   });
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
@@ -2194,7 +2373,14 @@ function handleMessengerShare(app){
 async function runAnalysis(){
   const old=document.getElementById('api-error-card');if(old)old.remove();
   if(S.tab==='audio'&&S.afiles.filter(f=>f.status==='p').length)await transcribeAll();
-  const msg=getText();if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
+  const msg=getText();
+  if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
+  
+  // Screenshot mode
+  if(S.tab==='screenshot'){
+    if(!S.isPro){openProUpgrade();return;}
+    if(!screenshots.length){showToast('Bitte zuerst ein Screenshot hochladen.');return;}
+  }
   const ctx=document.getElementById('ctxIn').value.trim();
 
   // Show loading
@@ -2223,6 +2409,17 @@ async function runAnalysis(){
 function renderAnalysis(r,msg){
   const srcMap={partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
   document.getElementById('analysis-src-label').textContent='Empfangen von '+(srcMap[S.src]||'Andere');
+  
+  // Show transcript if screenshot analysis
+  const transBox = document.getElementById('transcript-box');
+  if(transBox){
+    if(r.transcript){
+      transBox.style.display='block';
+      transBox.querySelector('.transcript-text').textContent=r.transcript;
+    } else {
+      transBox.style.display='none';
+    }
+  }
 
   const t=S.togs;
   if(t.self&&r.self){
