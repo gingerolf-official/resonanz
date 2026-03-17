@@ -2525,20 +2525,31 @@ async function callAPI(prompt){
   }
 
   // Cloud-Modelle → über Resonanz-Backend (kein Key im Browser)
-  // Map model IDs to API names
   const modelMap={claude:'claude',haiku:'haiku',gpt4:'gpt4',mini:'mini'};
-  const r=await fetch(BACKEND+'/api/analyse',{
-    method:'POST',
-    headers:{
-      'Content-Type':'application/json',
-      'x-resonanz-token': localStorage.getItem('resonanz_token_v1')||''
-    },
-    body:JSON.stringify({
-      prompt,
-      model:modelMap[S.model]||S.model,
-      images: S.tab==='screenshot' ? getScreenshotData() : undefined
-    })
-  });
+  const ctrl=new AbortController();
+  const tId=setTimeout(()=>ctrl.abort(),55000); // 55s client timeout
+  let r;
+  try{
+    r=await fetch(BACKEND+'/api/analyse',{
+      method:'POST',
+      signal:ctrl.signal,
+      headers:{
+        'Content-Type':'application/json',
+        'x-resonanz-token': localStorage.getItem('resonanz_token_v1')||''
+      },
+      body:JSON.stringify({
+        prompt,
+        model:modelMap[S.model]||S.model,
+        images: S.tab==='screenshot' ? getScreenshotData() : undefined
+      })
+    });
+  }catch(fetchErr){
+    clearTimeout(tId);
+    if(fetchErr.name==='AbortError')
+      throw new Error('Zeitüberschreitung — Analyse hat zu lange gedauert. Bei langen Chats bitte kürzen.');
+    throw new Error('Verbindung fehlgeschlagen — bitte Internetverbindung prüfen und nochmals versuchen.');
+  }
+  clearTimeout(tId);
   if(!r.ok){
     const e=await r.json().catch(()=>({}));
     const msg=e.error||'';
@@ -2546,7 +2557,8 @@ async function callAPI(prompt){
       showUsageError(S.model==='claude'?'Anthropic':'OpenAI');
       throw new Error('usage_exhausted');
     }
-    throw new Error(msg||'Server-Fehler '+r.status+' — Backend erreichbar?');
+    if(r.status===401||r.status===403)throw new Error('Kein gültiger Zugangscode — bitte in den Einstellungen einen Code eingeben.');
+    throw new Error(msg||'Server-Fehler '+r.status);
   }
   const d=await r.json();
   return d.result;
@@ -2668,6 +2680,12 @@ async function runAnalysis(){
 
   const msg=getText();
   if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
+
+  // Chat too long — warn user (backend limit is 30k chars, prompt adds ~2k overhead)
+  if(S.tab==='chat'&&msg.length>22000){
+    showToast('Chat-Export zu lang ('+Math.round(msg.length/1000)+'k Zeichen) — bitte auf die letzten 50–100 Nachrichten kürzen.');
+    return;
+  }
 
   // Free text/chat limit gate (screenshot already gated above)
   if(!S.isPro && S.tab!=='screenshot'){
