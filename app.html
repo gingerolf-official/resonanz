@@ -557,6 +557,25 @@ audio{width:100%;height:28px;margin-top:6px}
 .sc-del{margin-left:auto;background:none;border:none;color:var(--txs);cursor:pointer;font-size:16px;padding:4px 6px;border-radius:6px}
 .sc-del:hover{background:var(--sur2);color:var(--acc)}
 
+.chat-patterns-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:480px){.chat-patterns-grid{grid-template-columns:1fr}}
+.cpat-col{background:var(--sur2);border-radius:var(--r);padding:12px 14px}
+.cpat-label{font-size:10px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;color:var(--txs);margin-bottom:6px}
+.cpat-text{font-size:13px;color:var(--txm);line-height:1.65}
+.tp-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.tp-item{padding:10px 12px;border-left:2px solid #4A7C6F;border-radius:0 8px 8px 0;background:rgba(42,71,64,.04)}
+.tp-moment{font-size:12px;font-weight:500;color:var(--p);font-style:italic;margin-bottom:3px}
+.tp-shift{font-size:13px;color:var(--txm);line-height:1.55}
+.tp-missed{font-size:12px;color:var(--txs);line-height:1.5;margin-top:5px;padding:5px 8px;background:rgba(42,71,64,.06);border-radius:5px}
+.mopp-list{display:flex;flex-direction:column;gap:10px}
+.mopp-item{border:.5px solid var(--bd);border-radius:var(--r);overflow:hidden}
+.mopp-head{padding:8px 12px;background:var(--sur2);font-size:12px;font-style:italic;color:var(--txm)}
+.mopp-what{padding:8px 12px 4px;font-size:12.5px;color:var(--txs);line-height:1.55}
+.mopp-alt{margin:0 12px 6px;padding:6px 10px;font-size:13.5px;color:var(--txm);line-height:1.65;border-left:2px solid var(--gold);border-radius:0 4px 4px 0;background:rgba(154,122,70,.06)}
+.mopp-focus{padding:0 12px 6px;font-size:11px;color:var(--txs);font-style:italic}
+.mopp-foot{padding:0 12px 10px;display:flex;gap:6px}
+.mopp-train-btn{font-size:11.5px;padding:4px 10px;border-radius:8px;border:.5px solid var(--gold);background:rgba(154,122,70,.08);color:var(--gold);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .12s}
+
 </style>
 </head>
 <body>
@@ -1196,6 +1215,38 @@ if(existingToken) {
         <div class="card-body"><div id="gBeliefs"></div></div>
       </div>
 
+      <!-- Chat: Gesprächsdynamik & Wendepunkte -->
+      <div class="card" id="rc-chat-dynamics" style="display:none">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot" style="background:#4A7C6F"></div><div><div class="cname">Gesprächsdynamik</div><div class="csub">Verlauf und Wendepunkte</div></div></div>
+        </div>
+        <div class="card-body">
+          <div id="gDynamics" style="font-size:13.5px;color:var(--txm);line-height:1.65;margin-bottom:12px"></div>
+          <div class="tp-list" id="gTurningPoints"></div>
+        </div>
+      </div>
+
+      <!-- Chat: Kommunikationsmuster -->
+      <div class="card" id="rc-chat-patterns" style="display:none">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot" style="background:#4A7C6F"></div><div><div class="cname">Kommunikationsmuster</div><div class="csub">Meine und ihre Stile</div></div></div>
+        </div>
+        <div class="card-body">
+          <div class="chat-patterns-grid">
+            <div class="cpat-col"><div class="cpat-label">Meine Muster</div><div class="cpat-text" id="gMyPatterns"></div></div>
+            <div class="cpat-col"><div class="cpat-label">Ihre Muster</div><div class="cpat-text" id="gTheirPatterns"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat: Verpasste Chancen — Pro -->
+      <div class="card" id="rc-chat-opps" style="display:none">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot" style="background:var(--gold)"></div><div><div class="cname">Verpasste Chancen<span class="pro-badge">PRO</span></div><div class="csub">Momente für GFK-Übung</div></div></div>
+        </div>
+        <div class="card-body"><div class="mopp-list" id="gMissedOpps"></div></div>
+      </div>
+
       <!-- Next step hint -->
       <div class="card" id="rc-train-hint" style="background:rgba(42,71,64,.04);border-color:rgba(42,71,64,.15)">
         <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -1379,7 +1430,7 @@ const S={
   isPro:false,freeAudioToday:0,
   togs:{self:true,resp:true,sum:true,trig:true,train:true},
   afiles:[],transcripts:[],popWord:null,
-  lastGFK:null,curStep:1
+  lastGFK:null,curStep:1,lastMissedOpp:null
 };
 // ── Constants & State ────────────────────────────
 const KEY_STORE = 'resonanz_keys_v1';
@@ -1481,6 +1532,7 @@ async function trOpenAI(file, lang) {
 
 function buildGFKPrompt(msg, ctx) {
   if (S.tab === 'screenshot') return buildScreenshotPrompt(ctx);
+  if (S.tab === 'chat') return buildChatPrompt(msg, ctx);
 
   const srcMap = {
     partner: 'Partner/Partnerin', mother: 'Mutter', father: 'Vater',
@@ -1548,6 +1600,68 @@ function buildGFKPrompt(msg, ctx) {
   return isDetailed ? promptDetailed : promptSimple;
 }
 
+function buildChatPrompt(msg, ctx) {
+  const srcMap = {
+    partner: 'Partner/Partnerin', mother: 'Mutter', father: 'Vater',
+    friend: 'Freund/Freundin', colleague: 'Kolleg/in', other: 'einer anderen Person'
+  };
+  const lang = S.outputLang || 'de';
+  const langMap = {
+    de: 'Antworte auf Deutsch.', en: 'Respond in English.',
+    es: 'Responde en español.', fr: 'Réponds en français.',
+    it: 'Rispondi in italiano.', tr: 'Türkçe yanıt ver.',
+    ar: 'أجب باللغة العربية.', ru: 'Отвечай на русском языке.',
+    zh: '用中文回答。', ja: '日本語で回答してください。',
+    pt: 'Responda em português.', nl: 'Antwoord in het Nederlands.'
+  };
+  const langInstr = langMap[lang] || 'Respond in ' + lang + '.';
+  const src = srcMap[S.src] || 'einer anderen Person';
+  const isDetailed = S.gfkDetail === 'detailed';
+  const ctxPart = ctx ? '\nContext: ' + ctx : '';
+  const langEnforce = '\n\nCRITICAL: ' + langInstr + ' Write EVERY string value in the JSON in that language. No exceptions.';
+
+  const beliefSchema = S.isPro
+    ? ',"beliefs":[{"quote":"[exact phrase revealing a belief]","belief":"[the underlying belief pattern]","reframe":"[compassionate NVC reframe]"}]'
+    : '';
+
+  const schemaSimple =
+    '{"dynamics":"[2-3 sentences describing the conversation arc and emotional dynamic]",' +
+    '"self":{"observation":"[factual observation of the exchange]","feeling":"[main feeling triggered]","need":"[core universal need]","request":"[one concrete request to myself]"},' +
+    '"my_patterns":"[my communication patterns in 1-2 sentences]",' +
+    '"their_patterns":"[their communication patterns in 1-2 sentences]",' +
+    '"turning_points":[{"moment":"[exact quote]","shift":"[what changed in the dynamic]"}],' +
+    '"missed_opportunities":[{"exchange":"[exact quote]","what_happened":"[brief explanation]","nvc_alternative":"[NVC reformulation]"}],' +
+    '"response":"[empathetic NVC reply, 2-3 sentences]",' +
+    '"summary":"[neutral summary, 2-3 sentences]",' +
+    '"tags":["tag1","tag2"],' +
+    '"triggers":[{"phrase":"[triggering phrase]","explanation":"[brief explanation]"}]' +
+    beliefSchema + '}';
+
+  const schemaDetailed =
+    '{"dynamics":"[3-4 sentences describing the full conversation arc and emotional dynamic]",' +
+    '"self":{"observation":"[exact factual observation]","feeling":"[real NVC feeling]","need":"[deep universal need]","need_context":"[why this need matters in this relationship]","request":"[one concrete request to myself]","old_pattern":"[old wound or pattern activated]"},' +
+    '"my_patterns":"[my communication patterns in 2-3 sentences, specific examples]",' +
+    '"their_patterns":"[their communication patterns in 2-3 sentences, specific examples]",' +
+    '"turning_points":[{"moment":"[exact quote]","shift":"[what changed]","missed_nvc":"[what NVC could have done here]"}],' +
+    '"missed_opportunities":[{"exchange":"[exact quote]","what_happened":"[explanation of the dynamic]","nvc_alternative":"[NVC reformulation]","practice_focus":"[specific skill to practice]"}],' +
+    '"response":"[empathetic NVC reply, 3-5 sentences, warm]",' +
+    '"response_tip":"[specific tip for tone or timing]",' +
+    '"summary":"[neutral 3-4 sentence summary]",' +
+    '"communication_pattern":"[name the visible communication pattern]",' +
+    '"relationship_insight":"[one deeper insight about this relationship]",' +
+    '"tags":["tag1","tag2","tag3"],' +
+    '"triggers":[{"phrase":"[triggering phrase]","explanation":"[wound activated]","somatic":"[possible body sensation]"}],' +
+    '"growth_impulse":"[one concrete practice or reflection]"' +
+    beliefSchema + '}';
+
+  const schema = isDetailed ? schemaDetailed : schemaSimple;
+
+  return 'You are an empathetic NVC coach. ' + langInstr +
+    ' Analyze this full CONVERSATION between me and ' + src + '.' + ctxPart +
+    '\n\nConversation:\n' + msg +
+    '\n\nFocus: conversation arc, patterns on both sides, key turning points, missed NVC moments.' +
+    '\n\nReply ONLY with valid JSON, no markdown:\n' + schema + langEnforce;
+}
 
 
 function saveSettings(){
@@ -2383,7 +2497,7 @@ function fullReset(){
   // Clear audio
   S.afiles=[];S.transcripts=[];screenshots=[];S._screenshotTranscript=null;renderAList();renderTRs();renderScreenshots();const scArea=document.getElementById('screenshot-transcript-area');if(scArea)scArea.innerHTML='';
   // Clear analysis
-  S.lastGFK=null;
+  S.lastGFK=null;S.lastMissedOpp=null;
   // Clear training
   const tr=document.getElementById('trainResults');if(tr)tr.style.display='none';
   // Clear errors
@@ -2450,7 +2564,9 @@ async function runAnalysis(){
   btn.disabled=true;btn.classList.add('ld');
   const lc=document.getElementById('lcard-1');lc.classList.add('show');
 
-  const msgs=[['Höre mit dem Herzen zu …','Erkenne Beobachtungen, Gefühle und Bedürfnisse'],['Erkenne Muster …','Identifiziere Trigger und alte Wunden'],['Formuliere mit Mitgefühl …','Erstelle GFK-Antwortvorschläge']];
+  const msgs=S.tab==='chat'
+    ?[['Lese das Gespräch …','Erkenne Verlauf und Dynamik'],['Analysiere Muster …','Meine und ihre Kommunikationsstile'],['Finde Wendepunkte …','Schlüsselmomente im Gespräch']]
+    :[['Höre mit dem Herzen zu …','Erkenne Beobachtungen, Gefühle und Bedürfnisse'],['Erkenne Muster …','Identifiziere Trigger und alte Wunden'],['Formuliere mit Mitgefühl …','Erstelle GFK-Antwortvorschläge']];
   let mi=0;const li=setInterval(()=>{mi=(mi+1)%msgs.length;document.getElementById('lt1').textContent=msgs[mi][0];document.getElementById('ls1').textContent=msgs[mi][1];},1800);
 
   try{
@@ -2471,7 +2587,9 @@ async function runAnalysis(){
 
 function renderAnalysis(r,msg){
   const srcMap={partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
-  document.getElementById('analysis-src-label').textContent='Empfangen von '+(srcMap[S.src]||'Andere');
+  document.getElementById('analysis-src-label').textContent=
+    S.tab==='chat'?('Gesprächsanalyse mit '+(srcMap[S.src]||'Andere'))
+    :('Empfangen von '+(srcMap[S.src]||'Andere'));
   
   // Show transcript if screenshot analysis
   const transBox = document.getElementById('transcript-box');
@@ -2530,12 +2648,53 @@ function renderAnalysis(r,msg){
     }
   }
 
+  // Chat-specific cards
+  const isChatResult = S.tab === 'chat';
+  const rcDyn=document.getElementById('rc-chat-dynamics');
+  const rcPat=document.getElementById('rc-chat-patterns');
+  const rcOpps=document.getElementById('rc-chat-opps');
+
+  if(rcDyn){
+    if(isChatResult&&r.dynamics){
+      document.getElementById('gDynamics').textContent=r.dynamics;
+      const tpList=document.getElementById('gTurningPoints');
+      if(tpList&&r.turning_points&&r.turning_points.length){
+        tpList.innerHTML=r.turning_points.map(tp=>`<div class="tp-item"><div class="tp-moment">»${tp.moment||''}«</div><div class="tp-shift">${tp.shift||''}</div>${tp.missed_nvc?`<div class="tp-missed">GFK: ${tp.missed_nvc}</div>`:''}</div>`).join('');
+      }else if(tpList){tpList.innerHTML='';}
+      rcDyn.style.display='';
+    }else{rcDyn.style.display='none';}
+  }
+
+  if(rcPat){
+    if(isChatResult&&(r.my_patterns||r.their_patterns)){
+      document.getElementById('gMyPatterns').textContent=r.my_patterns||'';
+      document.getElementById('gTheirPatterns').textContent=r.their_patterns||'';
+      rcPat.style.display='';
+    }else{rcPat.style.display='none';}
+  }
+
+  if(rcOpps){
+    if(isChatResult&&S.isPro&&r.missed_opportunities&&r.missed_opportunities.length){
+      document.getElementById('gMissedOpps').innerHTML=r.missed_opportunities.map((o,i)=>`<div class="mopp-item"><div class="mopp-head">»${o.exchange||''}«</div><div class="mopp-what">${o.what_happened||''}</div><div class="mopp-alt">${o.nvc_alternative||''}</div>${o.practice_focus?`<div class="mopp-focus">Fokus: ${o.practice_focus}</div>`:''}<div class="mopp-foot"><button class="mopp-train-btn" onclick="selectMissedOpp(${i})">Üben →</button></div></div>`).join('');
+      rcOpps.style.display='';
+    }else{rcOpps.style.display='none';}
+  }
+
   // Auto-save to journal
   saveEntry(r, msg);
   const jn=loadJournalData().length;
   document.getElementById('step-4').querySelector('.step-num').textContent=jn<=99?jn:'◎';
 }
 
+function selectMissedOpp(idx){
+  const opps=S.lastGFK&&S.lastGFK.missed_opportunities;
+  if(!opps||!opps[idx])return;
+  S.lastMissedOpp=opps[idx];
+  const ta=document.getElementById('userResp');
+  if(ta){ta.value='';ta.placeholder='Wie würdest du diesen Moment anders formulieren?\n\n»'+(S.lastMissedOpp.exchange||'')+'«';}
+  goStep(3);
+  showToast('Moment ausgewählt — schreib deine GFK-Version');
+}
 
 async function runTraining(){
   const userResp=document.getElementById('userResp').value.trim();
@@ -2548,7 +2707,12 @@ async function runTraining(){
   document.getElementById('trainResults').style.display='none';
 
   try{
-    const origMsg=getText(),ctx=document.getElementById('ctxIn').value.trim();
+    const origMsg=(S.tab==='chat'&&S.lastMissedOpp)
+      ?S.lastMissedOpp.exchange
+      :(S.tab==='chat'&&S.lastGFK&&S.lastGFK.dynamics)
+        ?S.lastGFK.dynamics
+        :getText();
+    const ctx=document.getElementById('ctxIn').value.trim();
     const raw=await callAPI(buildTrainPrompt(origMsg,S.lastGFK,userResp,ctx));
     const res=parseJSON(raw);
     if(!res)throw new Error('Ungültige Antwort — bitte nochmals versuchen.');
@@ -2563,6 +2727,7 @@ async function runTraining(){
 
 
 function renderTraining(r){
+  S.lastMissedOpp=null;
   // Self + Recv
   const renderImpact=(items)=>(items||[]).map(i=>`<div class="impact-row"><div class="impact-ico">${i.icon||'◎'}</div><div><div class="impact-lbl">${i.label||''}</div><div class="impact-txt">${i.text||''}</div></div></div>`).join('');
   document.getElementById('tr-self').innerHTML=renderImpact(r.selfReflection);
@@ -2667,7 +2832,7 @@ function svNative(){
 function loadChat(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=e=>document.getElementById('chatIn').value=e.target.result;r.readAsText(f);}
 
 
-function newAnalysis(){S.lastGFK=null;S.transcripts=[];S.afiles=[];renderAList();renderTRs();document.getElementById('trainResults').style.display='none';goStep(1);}
+function newAnalysis(){S.lastGFK=null;S.lastMissedOpp=null;S.transcripts=[];S.afiles=[];renderAList();renderTRs();document.getElementById('trainResults').style.display='none';goStep(1);}
 
 
 function showToast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
@@ -3549,7 +3714,12 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
   const trainBeliefSchema = S.isPro
     ? ',"beliefs":[{"quote":"[exact phrase from the user\'s response revealing a belief]","belief":"[the underlying belief pattern]","reframe":"[compassionate NVC reframe]"}]'
     : '';
-  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"[short label]","text":"[what this response reveals about the user]"}],"recipientPerspective":[{"icon":"emoji","label":"[short label]","text":"[how it lands with the other person]"}],"values":[{"name":"[value name]","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"[short title]","description":"[short description]"},"alternatives":[{"strategy":"[name]","effect":"[short]","text":"[concrete response]","tradeoff":"[gain/loss]"}],"pattern":"[communication pattern described warmly]","growth":"[concrete growth impulse]"${trainBeliefSchema}}\n\nCRITICAL: ${langInstr} Write EVERY string value in the JSON in that language. No exceptions.`;
+  const missedOppContext=S.lastMissedOpp
+    ?'\nFocus on this exchange: "'+S.lastMissedOpp.exchange+'"'
+     +'\nNVC alternative: "'+S.lastMissedOpp.nvc_alternative+'"'
+     +(S.lastMissedOpp.practice_focus?'\nPractice focus: '+S.lastMissedOpp.practice_focus:'')
+    :'';
+  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}${missedOppContext}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"[short label]","text":"[what this response reveals about the user]"}],"recipientPerspective":[{"icon":"emoji","label":"[short label]","text":"[how it lands with the other person]"}],"values":[{"name":"[value name]","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"[short title]","description":"[short description]"},"alternatives":[{"strategy":"[name]","effect":"[short]","text":"[concrete response]","tradeoff":"[gain/loss]"}],"pattern":"[communication pattern described warmly]","growth":"[concrete growth impulse]"${trainBeliefSchema}}\n\nCRITICAL: ${langInstr} Write EVERY string value in the JSON in that language. No exceptions.`;
 }
 
 
