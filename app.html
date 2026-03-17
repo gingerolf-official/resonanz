@@ -1065,6 +1065,11 @@ if(existingToken) {
             </div>
             <input type="file" id="aIn" accept="audio/*" multiple onchange="addFiles(this.files)" style="display:none">
             <div class="alist" id="alist"></div>
+            <div id="free-audio-indicator" class="pro-indicator" style="display:none;margin-top:8px">
+              <span>🎙</span>
+              <span class="pi-free">3 kostenlose Transkriptionen heute</span>
+              <div style="flex:1"><div class="free-limit-bar"><div class="free-limit-fill" style="width:0%"></div></div></div>
+            </div>
             <div id="transcribe-action" style="display:none;margin-top:10px;align-items:center;gap:10px;flex-wrap:wrap">
               <button class="btn btn-ghost" id="transcribeBtn" onclick="transcribeAll()" style="font-size:13px;padding:8px 16px">
                 <span class="bi">🎙 Jetzt transkribieren</span><div class="spin"></div>
@@ -1154,6 +1159,7 @@ if(existingToken) {
         <div class="detail-opt sel" data-val="simple" onclick="setGfkDetail(this,'simple')" style="font-size:12px;padding:5px 14px;border-radius:16px;cursor:pointer;border:.5px solid var(--bd);background:var(--p);color:white;transition:all .15s">Einfach</div>
         <div class="detail-opt" data-val="detailed" onclick="setGfkDetail(this,'detailed')" style="font-size:12px;padding:5px 14px;border-radius:16px;cursor:pointer;border:.5px solid var(--bd);background:transparent;color:var(--txm);transition:all .15s">Detailliert</div>
       </div>
+      <div id="usage-badge" style="display:none;font-size:11px;text-align:center;padding:5px 0 2px;line-height:1.5"></div>
       <div class="next-row">
         <button class="btn btn-primary" id="analyseBtn" onclick="runAnalysis()">
           <span class="bi">✦</span><div class="spin"></div>
@@ -1454,6 +1460,8 @@ const SETTINGS_KEY = 'resonanz_settings_v1';
 const PRO_KEY = 'resonanz_pro_v1';
 const FREE_AUDIO_KEY = 'resonanz_free_audio_' + new Date().toDateString();
 const FREE_AUDIO_LIMIT = 3;
+const FREE_TEXT_KEY = 'resonanz_free_text_' + new Date().toDateString();
+const FREE_TEXT_LIMIT = 10;
 const UI_LANG_KEY = 'resonanz_ui_lang';
 let uiLang = localStorage.getItem(UI_LANG_KEY) || 'de';
 
@@ -2004,6 +2012,16 @@ function goStep(n){
     document.getElementById('screen-4').classList.add('act');
     renderJournal();window.scrollTo({top:0,behavior:'smooth'});return;
   }
+  if(n===5){
+    if(!S.isPro){openProUpgrade();return;}
+    S.curStep=5;
+    document.querySelectorAll('.step').forEach((s,i)=>{s.classList.remove('act','done');if(i<4)s.classList.add('done');});
+    document.getElementById('step-5').classList.add('act');document.getElementById('step-5').classList.remove('done');
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('act'));
+    document.getElementById('screen-5').classList.add('act');
+    openMapScreen();window.scrollTo({top:0,behavior:'smooth'});return;
+  }
+  if(n===3&&!S.isPro){openProUpgrade();return;}
   if(n>1&&!S.lastGFK){showToast('Bitte zuerst eine Nachricht analysieren.');return;}
   S.curStep=n;
   document.querySelectorAll('.step').forEach((s,i)=>{s.classList.remove('act','done');if(i+1<n)s.classList.add('done');});
@@ -2283,6 +2301,33 @@ function incrementFreeAudio(){
 }
 
 
+function getFreeTextUsed(){
+  return parseInt(localStorage.getItem(FREE_TEXT_KEY)||'0',10);
+}
+
+
+function incrementFreeText(){
+  const u=getFreeTextUsed();
+  localStorage.setItem(FREE_TEXT_KEY,u+1);
+  return u+1;
+}
+
+
+function updateUsageBadge(){
+  const badge=document.getElementById('usage-badge');
+  if(!badge)return;
+  if(S.isPro){badge.style.display='none';return;}
+  const tUsed=getFreeTextUsed();
+  const aUsed=getFreeAudioUsed();
+  const tRem=Math.max(0,FREE_TEXT_LIMIT-tUsed);
+  const aRem=Math.max(0,FREE_AUDIO_LIMIT-aUsed);
+  badge.style.display='block';
+  const tColor=tRem===0?'var(--acc)':tRem<=2?'#C47B3A':'var(--txs)';
+  const aColor=aRem===0?'var(--acc)':aRem<=1?'#C47B3A':'var(--txs)';
+  badge.innerHTML=`<span style="color:${tColor}">✦ ${tRem}/${FREE_TEXT_LIMIT} Analysen</span> <span style="color:var(--txs)">·</span> <span style="color:${aColor}">🎙 ${aRem}/${FREE_AUDIO_LIMIT} Audio</span> <span style="color:var(--txs)">heute · Lite</span>`;
+}
+
+
 function showProWall(feature){
   const features = {
     audio: {icon:'🎙', title:'Audio-Transkription', sub:'Lade unbegrenzt Sprachnachrichten hoch und lass sie transkribieren. Mit Resonanz Pro — für wenige Euro im Monat.'},
@@ -2305,9 +2350,57 @@ function showProWall(feature){
 
 
 function openProUpgrade(){
-  // For now: show info overlay
-  showToast('Pro-Version: Zugangscode mit PRO- Prefix verwenden');
-  openSettings();
+  const existing=document.getElementById('pro-upgrade-modal');
+  if(existing){existing.style.display='flex';return;}
+  const modal=document.createElement('div');
+  modal.id='pro-upgrade-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:2000;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML=`
+    <div style="background:var(--sur);border-radius:20px 20px 0 0;padding:24px 20px 32px;width:100%;max-width:480px;max-height:88vh;overflow-y:auto">
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--txs);margin-bottom:6px">Dein Plan</div>
+        <div style="font-size:21px;font-weight:700;color:var(--tx)">Resonanz Lite → Pro</div>
+        <div style="font-size:12.5px;color:var(--txs);margin-top:4px">Zugangscode eingeben — einmalig, kein Abo nötig</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px">
+        <div style="padding:12px;border-radius:12px;border:.5px solid var(--bd);background:var(--sur2)">
+          <div style="font-size:13px;font-weight:600;color:var(--txm);margin-bottom:8px">◎ Lite</div>
+          <div style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--txs)">
+            <div>✓ ${FREE_TEXT_LIMIT} Analysen/Tag</div>
+            <div>✓ ${FREE_AUDIO_LIMIT} Audio/Tag</div>
+            <div>✓ Text & Chat</div>
+            <div>✓ Einfache Tiefe</div>
+            <div style="color:var(--bd)">— Screenshots</div>
+            <div style="color:var(--bd)">— Detailliert</div>
+            <div style="color:var(--bd)">— Training</div>
+            <div style="color:var(--bd)">— Beziehungskarte</div>
+          </div>
+        </div>
+        <div style="padding:12px;border-radius:12px;border:.5px solid var(--p);background:rgba(42,71,64,.05)">
+          <div style="font-size:13px;font-weight:600;color:var(--p);margin-bottom:8px">✦ Pro</div>
+          <div style="display:flex;flex-direction:column;gap:5px;font-size:11.5px;color:var(--txm)">
+            <div>✓ Unbegrenzt</div>
+            <div>✓ Audio unbegrenzt</div>
+            <div>✓ Text, Chat & Audio</div>
+            <div>✓ Einfach & Detailliert</div>
+            <div>✓ Screenshots</div>
+            <div>✓ Tiefe Analyse</div>
+            <div>✓ Komm.-Training</div>
+            <div>✓ Beziehungskarte</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:10px 12px;background:rgba(42,71,64,.05);border-radius:10px;margin-bottom:16px;font-size:12px;color:var(--txm);text-align:center;line-height:1.55">
+        Pro-Code beginnt mit <strong>PRO-</strong> (z.B. PRO-FREUND01)<br>
+        Code eingeben unter <strong>⚙️ Einstellungen → Zugangscode</strong>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button onclick="document.getElementById('pro-upgrade-modal').style.display='none';openSettings()" style="flex:1;padding:12px;background:var(--p);color:white;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Code eingeben →</button>
+        <button onclick="document.getElementById('pro-upgrade-modal').style.display='none'" style="padding:12px 16px;background:var(--sur2);color:var(--txm);border:.5px solid var(--bds);border-radius:12px;font-size:13px;cursor:pointer;font-family:inherit">✕</button>
+      </div>
+    </div>`;
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.style.display='none';});
+  document.body.appendChild(modal);
 }
 
 
@@ -2350,6 +2443,7 @@ function switchITab(name, el){
   document.querySelectorAll('[id^="itab-"]').forEach(t=>t.style.display='none');
   const target = document.getElementById('itab-'+name);
   if(target)target.style.display='';
+  if(name==='audio')showFreeUsageIndicator();
 }
 
 
@@ -2574,6 +2668,19 @@ async function runAnalysis(){
 
   const msg=getText();
   if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
+
+  // Free text/chat limit gate (screenshot already gated above)
+  if(!S.isPro && S.tab!=='screenshot'){
+    const used=getFreeTextUsed();
+    if(used>=FREE_TEXT_LIMIT){
+      openProUpgrade();
+      showToast(`Tageslimit: ${FREE_TEXT_LIMIT} Analysen/Tag im Lite-Plan`);
+      return;
+    }
+    incrementFreeText();
+    updateUsageBadge();
+  }
+
   const ctx=document.getElementById('ctxIn').value.trim();
 
   // Show loading
@@ -3863,7 +3970,7 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
 
 
 (function(){applyUiLang(uiLang);})();
-(function(){checkProStatus();showFreeUsageIndicator();})();
+(function(){checkProStatus();showFreeUsageIndicator();updateUsageBadge();})();
 
 // ── Init: load persisted settings ───────────────
 (function(){ loadSettings(); })();
