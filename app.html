@@ -1453,48 +1453,45 @@ function buildGFKPrompt(msg, ctx) {
   const langInstr = langMap[lang] || 'Respond in ' + lang + '.';
   const src = srcMap[S.src] || 'einer anderen Person';
   const isDetailed = S.gfkDetail === 'detailed';
-  const ctxPart = ctx ? '\nKontext: ' + ctx : '';
-  const msgPart = '\nNachricht von ' + src + ': "' + msg + '"';
+  const ctxPart = ctx ? '\nContext: ' + ctx : '';
+  const msgPart = '\nMessage from ' + src + ': "' + msg + '"';
+  // Repeated at end so the model cannot miss it
+  const langEnforce = '\n\nCRITICAL: ' + langInstr + ' Write EVERY string value in the JSON in that language. No exceptions.';
 
-  const jsonSimple = JSON.stringify({
-    self: {
-      observation: "Was wurde tatsächlich gesagt/getan (eine Satz, keine Interpretation)",
-      feeling: "Das Hauptgefühl das diese Nachricht auslöst",
-      need: "Das zentrale menschliche Bedürfnis dahinter",
-      request: "Eine konkrete Bitte an mich selbst"
-    },
-    response: "Einfühlsame GFK-Antwort (2-3 Sätze)",
-    summary: "Neutrale Zusammenfassung in 2-3 klaren Sätzen",
-    tags: ["tag1", "tag2"],
-    triggers: [{phrase: "auslösende Phrase", explanation: "kurze Erklärung"}]
-  }, null, 2);
+  // Language-neutral schema placeholders — the langInstr controls the output language
+  const schemaSimple =
+    '{"self":{"observation":"[factual observation, 1 sentence, no interpretation]",' +
+    '"feeling":"[main feeling this message triggers]",' +
+    '"need":"[core universal human need behind this]",' +
+    '"request":"[one concrete request to myself]"},' +
+    '"response":"[empathetic NVC reply, 2-3 sentences]",' +
+    '"summary":"[neutral summary, 2-3 sentences]",' +
+    '"tags":["tag1","tag2"],' +
+    '"triggers":[{"phrase":"[triggering phrase]","explanation":"[brief explanation]"}]}';
 
-  const jsonDetailed = JSON.stringify({
-    self: {
-      observation: "Genaue faktische Beobachtung ohne Interpretation",
-      feeling: "Das echte GFK-Gefühl hinter dieser Nachricht",
-      need: "Das tiefe universelle Bedürfnis dahinter",
-      need_context: "Warum dieses Bedürfnis in dieser Beziehung wichtig ist",
-      request: "Eine konkrete Bitte die ich mir selbst stellen könnte",
-      old_pattern: "Welches alte Muster oder Wunde könnte das aktivieren?"
-    },
-    response: "Einfühlsame GFK-Antwort (3-5 Sätze, warm und verbindend)",
-    response_tip: "Ein spezifischer Tipp für Ton, Timing oder Kontext",
-    summary: "Neutrale 3-4 Satz Zusammenfassung der Dynamik",
-    communication_pattern: "Das sichtbare Kommunikationsmuster benennen",
-    relationship_insight: "Eine tiefere Einsicht über diese Beziehungsdynamik",
-    tags: ["tag1", "tag2", "tag3"],
-    triggers: [{phrase: "auslösende Phrase", explanation: "welche Wunde aktiviert das?", somatic: "mögliche Körperempfindung"}],
-    growth_impulse: "Eine konkrete Übung oder Reflexion zum Wachsen"
-  }, null, 2);
+  const schemaDetailed =
+    '{"self":{"observation":"[exact factual observation, no interpretation]",' +
+    '"feeling":"[real NVC feeling behind this message]",' +
+    '"need":"[deep universal need]",' +
+    '"need_context":"[why this need matters in this relationship]",' +
+    '"request":"[one concrete request to myself]",' +
+    '"old_pattern":"[old wound or pattern this might activate]"},' +
+    '"response":"[empathetic NVC reply, 3-5 sentences, warm]",' +
+    '"response_tip":"[specific tip for tone or timing]",' +
+    '"summary":"[neutral 3-4 sentence summary of the dynamic]",' +
+    '"communication_pattern":"[name the visible communication pattern]",' +
+    '"relationship_insight":"[one deeper insight about this relationship]",' +
+    '"tags":["tag1","tag2","tag3"],' +
+    '"triggers":[{"phrase":"[triggering phrase]","explanation":"[wound activated]","somatic":"[possible body sensation]"}],' +
+    '"growth_impulse":"[one concrete practice or reflection]"}';
 
   const promptSimple = 'You are an empathetic NVC coach. ' + langInstr +
     ' Analyze this message clearly and concisely.' + ctxPart + msgPart +
-    '\n\nReply ONLY with valid JSON, no markdown:\n' + jsonSimple;
+    '\n\nReply ONLY with valid JSON, no markdown:\n' + schemaSimple + langEnforce;
 
   const promptDetailed = 'You are a deeply empathetic NVC coach. ' + langInstr +
     ' Analyze this message thoroughly.' + ctxPart + msgPart +
-    '\n\nReply ONLY with valid JSON, no markdown:\n' + jsonDetailed;
+    '\n\nReply ONLY with valid JSON, no markdown:\n' + schemaDetailed + langEnforce;
 
   return isDetailed ? promptDetailed : promptSimple;
 }
@@ -3385,10 +3382,17 @@ function copyScreenshotTranscript(){
 
 function buildScreenshotPrompt(ctx){
   const lang = S.outputLang||'de';
-  const langMap={de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',ru:'Отвечай на русском языке.'};
+  const langMap={
+    de:'Antworte auf Deutsch.',en:'Respond in English.',es:'Responde en español.',
+    fr:'Réponds en français.',it:'Rispondi in italiano.',tr:'Türkçe yanıt ver.',
+    ar:'أجب باللغة العربية.',ru:'Отвечай на русском языке.',
+    zh:'用中文回答。',ja:'日本語で回答してください。',
+    pt:'Responda em português.',nl:'Antwoord in het Nederlands.'
+  };
   const langInstr = langMap[lang]||'Respond in '+lang+'.';
+  const langEnforce = '\n\nCRITICAL: ' + langInstr + ' Write EVERY string value in the JSON in that language. No exceptions.';
   const isDetailed = S.gfkDetail==='detailed';
-  const ctxPart = ctx ? '\nKontext: '+ctx : '';
+  const ctxPart = ctx ? '\nContext: '+ctx : '';
   const src = {partner:'Partner/Partnerin',mother:'Mutter',father:'Vater',friend:'Freund/Freundin',colleague:'Kolleg/in',other:'einer anderen Person'}[S.src]||'einer anderen Person';
 
   if(isDetailed){
@@ -3398,24 +3402,24 @@ The screenshot shows a conversation with ${src}. Read all visible text carefully
 
 Reply ONLY with valid JSON:
 {
-  "transcript": "Full text you can read from the screenshot(s), formatted as conversation",
+  "transcript": "[full text visible in screenshot, formatted as conversation]",
   "self": {
-    "observation": "What was factually said/written, without interpretation",
-    "feeling": "The main feeling triggered by this conversation",
-    "need": "The core universal need behind this feeling",
-    "need_context": "Why this need matters in this relationship",
-    "request": "One concrete thing I could do or ask right now",
-    "old_pattern": "What old wound or pattern might this activate?"
+    "observation": "[factual observation, no interpretation]",
+    "feeling": "[main feeling triggered by this conversation]",
+    "need": "[core universal need behind this feeling]",
+    "need_context": "[why this need matters in this relationship]",
+    "request": "[one concrete thing I could do or ask right now]",
+    "old_pattern": "[old wound or pattern this might activate]"
   },
-  "response": "Warm NVC response to send (3-5 sentences)",
-  "response_tip": "Specific tip for tone or timing",
-  "summary": "3-4 sentence neutral summary of the dynamic",
-  "communication_pattern": "Name the visible communication pattern",
-  "relationship_insight": "One deeper insight about this relationship",
+  "response": "[warm NVC response to send, 3-5 sentences]",
+  "response_tip": "[specific tip for tone or timing]",
+  "summary": "[3-4 sentence neutral summary of the dynamic]",
+  "communication_pattern": "[name the visible communication pattern]",
+  "relationship_insight": "[one deeper insight about this relationship]",
   "tags": ["tag1","tag2","tag3"],
-  "triggers": [{"phrase":"exact phrase","explanation":"what wound does this activate?","somatic":"possible body sensation"}],
-  "growth_impulse": "One thing to practice or reflect on"
-}`;
+  "triggers": [{"phrase":"[exact phrase]","explanation":"[what wound does this activate?]","somatic":"[possible body sensation]"}],
+  "growth_impulse": "[one thing to practice or reflect on]"
+}${langEnforce}`;
   }
 
   return `You are an empathetic NVC coach. ${langInstr} Analyze the conversation screenshot(s).${ctxPart}
@@ -3424,18 +3428,18 @@ The screenshot shows a message from ${src}. Read the visible text and provide a 
 
 Reply ONLY with valid JSON:
 {
-  "transcript": "Text visible in the screenshot (formatted as conversation)",
+  "transcript": "[text visible in the screenshot, formatted as conversation]",
   "self": {
-    "observation": "What was factually written (one sentence)",
-    "feeling": "Main feeling this triggers",
-    "need": "Core human need behind this",
-    "request": "One concrete thing to do or ask"
+    "observation": "[factual observation, one sentence]",
+    "feeling": "[main feeling this triggers]",
+    "need": "[core human need behind this]",
+    "request": "[one concrete thing to do or ask]"
   },
-  "response": "Warm NVC response to send (2-3 sentences)",
-  "summary": "2-3 sentence neutral summary",
+  "response": "[warm NVC response to send, 2-3 sentences]",
+  "summary": "[2-3 sentence neutral summary]",
   "tags": ["tag1","tag2"],
-  "triggers": [{"phrase":"most triggering phrase","explanation":"brief explanation"}]
-}`;
+  "triggers": [{"phrase":"[most triggering phrase]","explanation":"[brief explanation]"}]
+}${langEnforce}`;
 }
 
 
@@ -3454,7 +3458,7 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
     :lang==='pt'?'Responda em português.'
     :lang==='nl'?'Antwoord in het Nederlands.'
     :`Respond in ${S.outputLangName||lang}.`;
-  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"short label","text":"what this response reveals about the user"}],"recipientPerspective":[{"icon":"emoji","label":"short label","text":"how it lands with the other person"}],"values":[{"name":"value name","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"short title","description":"short description"},"alternatives":[{"strategy":"name","effect":"short","text":"concrete response","tradeoff":"gain/loss"}],"pattern":"communication pattern described warmly","growth":"concrete growth impulse"}`;
+  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"[short label]","text":"[what this response reveals about the user]"}],"recipientPerspective":[{"icon":"emoji","label":"[short label]","text":"[how it lands with the other person]"}],"values":[{"name":"[value name]","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"[short title]","description":"[short description]"},"alternatives":[{"strategy":"[name]","effect":"[short]","text":"[concrete response]","tradeoff":"[gain/loss]"}],"pattern":"[communication pattern described warmly]","growth":"[concrete growth impulse]"}\n\nCRITICAL: ${langInstr} Write EVERY string value in the JSON in that language. No exceptions.`;
 }
 
 
