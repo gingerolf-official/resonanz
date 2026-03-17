@@ -493,7 +493,7 @@ audio{width:100%;height:28px;margin-top:6px}
 /* ─── MAP SCREEN ─── */
 #map-canvas{display:block;width:100%;touch-action:none;cursor:default;border-radius:var(--rl);border:.5px solid var(--bd)}
 .map-wrap{position:relative;width:100%}
-.map-detail{position:absolute;top:10px;right:10px;width:195px;background:var(--sur);border:.5px solid var(--bds);border-radius:var(--rl);padding:13px 14px;font-size:13px;display:none;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.1)}
+.map-detail{position:absolute;top:10px;right:10px;width:230px;max-height:420px;overflow-y:auto;background:var(--sur);border:.5px solid var(--bds);border-radius:var(--rl);padding:13px 14px;font-size:13px;display:none;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.12)}
 .map-add-panel{position:absolute;top:10px;left:10px;width:200px;background:var(--sur);border:.5px solid var(--bds);border-radius:var(--rl);padding:13px 14px;display:none;flex-direction:column;gap:8px;z-index:10;box-shadow:0 4px 20px rgba(0,0,0,.1)}
 .map-legend{position:absolute;bottom:10px;right:10px;background:var(--sur);border:.5px solid var(--bd);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column;gap:4px}
 .mleg-row{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--txs)}
@@ -1493,6 +1493,7 @@ const T = {
 // ── Journal & Map Constants ───────────────────────
 const JK = 'resonanz_journal_v1';
 const MK = 'resonanz_map_v1';
+const MN = 'resonanz_map_names_v1';
 const SRC_LABELS = {partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
 const SRC_TO_KEY  = {partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
 const MAP_COLORS  = {
@@ -3031,6 +3032,56 @@ function saveMapNodes(){
 }
 
 
+function loadMapNames(){try{return JSON.parse(localStorage.getItem(MN)||'{}');}catch{return{};}}
+function saveMapNames(n){try{localStorage.setItem(MN,JSON.stringify(n));}catch{}}
+
+
+function autoDetectPersonName(entries){
+  const skip=['Von','Hey','Hallo','Hi','Ich','Du','Er','Sie','Wir','Ok','Ja','Nein','Danke','Aber','Wenn','Dann','Und','Oder','Das','Die','Der','Den','Dem'];
+  for(const e of entries){
+    if(!e.msgPreview)continue;
+    const m=e.msgPreview.match(/^([A-ZÄÖÜ][a-zäöü]{1,18})[:\s]/);
+    if(m&&!skip.includes(m[1]))return m[1];
+  }
+  return null;
+}
+
+
+function deriveDynamic(quality,conflictScore,avgEnergy,topNeed){
+  const parts=[];
+  if(quality==='draining')parts.push('Diese Beziehung fordert dich emotional stark heraus.');
+  else if(quality==='nourishing')parts.push('Diese Beziehung gibt dir Kraft und Stabilität.');
+  else if(quality==='challenging')parts.push('Diese Beziehung ist oft herausfordernd, birgt aber Wachstumspotenzial.');
+  else parts.push('Diese Beziehung verläuft überwiegend neutral.');
+  if(conflictScore>60)parts.push('Häufige Triggerpunkte — hohe emotionale Aktivierung.');
+  else if(conflictScore>30)parts.push('Gelegentliche Spannungsmomente vorhanden.');
+  if(avgEnergy<38)parts.push('Nachrichten dieser Person lassen dich oft erschöpft zurück.');
+  else if(avgEnergy>65)parts.push('Überwiegend positive Energiebilanz nach dem Austausch.');
+  if(topNeed)parts.push('Häufigstes Bedürfnis: '+topNeed+'.');
+  return parts.join(' ');
+}
+
+
+function generateTips(entries,node){
+  const tips=[];
+  const needFreq={};
+  entries.forEach(e=>{if(e.need)needFreq[e.need]=(needFreq[e.need]||0)+1;});
+  const topNeedEntry=Object.entries(needFreq).sort((a,b)=>b[1]-a[1])[0];
+  const topNeed=topNeedEntry?topNeedEntry[0]:null;
+  const q=node.quality;
+  const c=node.conflict||0;
+  const trend=node.trend||'stable';
+  if(c>50)tips.push('Erkenne deinen Trigger bevor du antwortest — kurze Pause, tiefer Atemzug.');
+  if(topNeed)tips.push('Dein häufigstes Bedürfnis hier: <em>'+topNeed+'</em>. Sprich es direkt an: „Ich brauche …"');
+  if(q==='draining')tips.push('Setze bewusst Grenzen mit einer konkreten NVC-Bitte statt stiller Erschöpfung.');
+  else if(q==='challenging')tips.push('Frag dich: Was ist das tiefste Bedürfnis dieser Person hinter ihrer Aussage?');
+  else if(q==='nourishing')tips.push('Diese Beziehung nährt dich — zeige aktiv Wertschätzung für das, was gut läuft.');
+  if(trend==='improving'&&entries.length>=4)tips.push('Deine Kommunikation verbessert sich sichtbar — diese Richtung weiter halten.');
+  else if(trend==='worsening'&&entries.length>=4)tips.push('Trend zeigt Belastung — erwäge ein offenes Gespräch über das Miteinander.');
+  return tips.slice(0,3);
+}
+
+
 function deriveQuality(entries){
   if(!entries.length)return'neutral';
   const avgEnergy=entries.reduce((s,e)=>s+(e.energy||50),0)/entries.length;
@@ -3044,25 +3095,55 @@ function deriveQuality(entries){
 
 function syncMapFromJournal(){
   const all=loadJournalData();
-  // Group by src
+  const names=loadMapNames();
   const bySrc={};
-  all.forEach(e=>{
-    if(!bySrc[e.src])bySrc[e.src]=[];
-    bySrc[e.src].push(e);
-  });
+  all.forEach(e=>{if(!bySrc[e.src])bySrc[e.src]=[];bySrc[e.src].push(e);});
 
-  // For each src: update or create node
   Object.entries(bySrc).forEach(([src,entries])=>{
-    const name=SRC_TO_KEY[src]||src;
+    // Name: stored override > auto-detect > generic label
+    const autoName=autoDetectPersonName(entries);
+    const displayName=names[src]||autoName||(SRC_TO_KEY[src]||src);
+
     const avgEnergy=Math.round(entries.reduce((s,e)=>s+(e.energy||50),0)/entries.length);
     const recentTriggers=entries.filter(e=>e.triggers&&e.triggers.length>0).length;
     const conflictScore=Math.round((recentTriggers/entries.length)*100);
     const importance=Math.min(100,Math.round(30+(entries.length*5)));
     const quality=deriveQuality(entries.map(e=>({...e,energy:avgEnergy,conflictScore})));
 
+    // Influence: how strongly does this person move user emotionally
+    const influenceScore=Math.min(100,Math.round(entries.reduce((s,e)=>s+Math.abs((e.energy||50)-50),0)/entries.length*3.3));
+
+    // Trend: compare recent half vs older half
+    let trend='stable';
+    if(entries.length>=4){
+      const h=Math.floor(entries.length/2);
+      const rAvg=entries.slice(0,h).reduce((s,e)=>s+(e.energy||50),0)/h;
+      const oAvg=entries.slice(h).reduce((s,e)=>s+(e.energy||50),0)/h;
+      if(rAvg>oAvg+8)trend='improving';
+      else if(rAvg<oAvg-8)trend='worsening';
+    }
+
+    // Top need
+    const needFreq={};
+    entries.forEach(e=>{if(e.need)needFreq[e.need]=(needFreq[e.need]||0)+1;});
+    const topNeedEntry=Object.entries(needFreq).sort((a,b)=>b[1]-a[1])[0];
+    const topNeed=topNeedEntry?topNeedEntry[0]:null;
+
+    // Top feelings
+    const feelingFreq={};
+    entries.forEach(e=>{if(e.feeling)feelingFreq[e.feeling]=(feelingFreq[e.feeling]||0)+1;});
+    const topFeelings=Object.entries(feelingFreq).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([f])=>f);
+
+    // Top tags
+    const tagFreq={};
+    entries.forEach(e=>(e.tags||[]).forEach(t=>{tagFreq[t]=(tagFreq[t]||0)+1;}));
+    const topTags=Object.entries(tagFreq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([t])=>t);
+
+    const dynamic=deriveDynamic(quality,conflictScore,avgEnergy,topNeed);
+
     let node=mapNodes.find(n=>n.src===src);
     if(node){
-      // Update data but keep position
+      node.name=displayName;
       node.importance=importance;
       node.energy=avgEnergy;
       node.conflict=conflictScore;
@@ -3070,15 +3151,20 @@ function syncMapFromJournal(){
       node.analysisCount=entries.length;
       node.lastDate=entries[0].date;
       node.r=Math.max(14,Math.min(30,(importance/100)*22+10));
+      node.influenceScore=influenceScore;
+      node.trend=trend;
+      node.dynamic=dynamic;
+      node.topNeed=topNeed;
+      node.topFeelings=topFeelings;
+      node.topTags=topTags;
     } else {
-      // New node — place it at a distance
       const angle=(mapNodes.length*1.1)+0.3;
       const dist=mapCX?mapCX*(.45+Math.random()*.25):120;
       mapNodes.push({
-        id:mapNextId++,src,name,type:name,
+        id:mapNextId++,src,name:displayName,type:displayName,
         quality,importance,energy:avgEnergy,conflict:conflictScore,
-        analysisCount:entries.length,lastDate:entries[0].date,
-        note:'',
+        analysisCount:entries.length,lastDate:entries[0].date,note:'',
+        influenceScore,trend,dynamic,topNeed,topFeelings,topTags,
         x:mapCX?mapCX+dist*Math.cos(angle):0,
         y:mapCY?mapCY+dist*Math.sin(angle):0,
         r:Math.max(14,Math.min(30,(importance/100)*22+10))
@@ -3086,7 +3172,6 @@ function syncMapFromJournal(){
     }
   });
 
-  // Mark max used id
   mapNodes.forEach(n=>{if(n.id>=mapNextId)mapNextId=n.id+1;});
   saveMapNodes();
 }
@@ -3195,11 +3280,13 @@ function drawMap(){
       mapCtx.fillText(Math.min(99,n.analysisCount),n.x-n.r*.65,n.y-n.r*.65);
     }
 
-    // Name
+    // Name label — show first name (or full if short)
     const tx=getComputedStyle(document.documentElement).getPropertyValue('--tx')||'#18281F';
+    const firstName=n.name.split(' ')[0];
+    const labelName=firstName.length<=14?firstName:firstName.slice(0,12)+'…';
     mapCtx.fillStyle=tx;mapCtx.font='400 11px sans-serif';
     mapCtx.textAlign='center';mapCtx.textBaseline='top';
-    mapCtx.fillText(n.name,n.x,n.y+n.r+4);
+    mapCtx.fillText(labelName,n.x,n.y+n.r+4);
   });
 
   // Center Ich
@@ -3249,24 +3336,38 @@ function showMapDetail(n){
   const p=document.getElementById('mapDetail');
   const c=MAP_COLORS[n.quality];
   const qlabels={nourishing:'Nährend',challenging:'Herausfordernd',draining:'Belastend',neutral:'Neutral'};
-  const dist=Math.hypot(n.x-mapCX,n.y-mapCY);
-  const proximity=Math.round((1-Math.min(1,dist/(Math.min(mapCX,mapCY)*.85)))*100);
+  const trendIcons={improving:'↗ Positive Entwicklung',stable:'→ Stabil',worsening:'↘ Zunehmend belastet'};
   const lastDate=n.lastDate?new Date(n.lastDate).toLocaleDateString('de-DE',{day:'numeric',month:'short'}):'–';
+  const entries=loadJournalData().filter(e=>e.src===n.src);
+  const tips=generateTips(entries,n);
+  const trendLabel=trendIcons[n.trend||'stable'];
+  const initials=n.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const feelings=(n.topFeelings||[]).join(', ');
 
   p.innerHTML=`
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <div style="width:28px;height:28px;border-radius:50%;background:${c.fill};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:white;flex-shrink:0">${n.name.slice(0,2).toUpperCase()}</div>
-      <div><div style="font-size:14px;font-weight:500;color:var(--tx)">${n.name}</div>
-      <div style="font-size:10.5px;color:var(--txs)">${n.analysisCount||0} Analysen · zuletzt ${lastDate}</div></div>
+      <div style="width:32px;height:32px;border-radius:50%;background:${c.fill};display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:white;flex-shrink:0">${initials}</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:var(--tx)">${n.name}</div>
+        <div style="font-size:10.5px;color:var(--txs)">${n.analysisCount||0} Analysen · zuletzt ${lastDate}</div>
+      </div>
     </div>
-    <div style="display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:10px;background:${c.light};color:${c.text};margin-bottom:8px">${qlabels[n.quality]}</div>
-    <div class="map-dp-lbl">Nähe (Position)</div>
-    <div class="map-bar"><div class="map-bar-fill" style="width:${proximity}%;background:${c.fill}"></div></div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px">
+      <span style="font-size:10.5px;padding:2px 8px;border-radius:10px;background:${c.light};color:${c.text};font-weight:500">${qlabels[n.quality]}</span>
+      <span style="font-size:10.5px;padding:2px 8px;border-radius:10px;background:var(--sur2);color:var(--txs)">${trendLabel}</span>
+    </div>
+    ${n.dynamic?`<div style="font-size:12px;color:var(--txm);line-height:1.6;padding:8px 10px;background:rgba(42,71,64,.05);border-radius:8px;margin-bottom:10px">${n.dynamic}</div>`:''}
+    <div class="map-dp-lbl">Emotionaler Einfluss</div>
+    <div class="map-bar"><div class="map-bar-fill" style="width:${Math.min(100,n.influenceScore||0)}%;background:${c.fill}"></div></div>
     <div class="map-dp-lbl">Energiebilanz</div>
     <div class="map-bar"><div class="map-bar-fill" style="width:${n.energy||50}%;background:${(n.energy||50)>50?'#4A9B7F':'#B05050'}"></div></div>
-    ${n.conflict>20?`<div class="map-dp-lbl">Konfliktfrequenz</div>
+    ${n.conflict>20?`<div class="map-dp-lbl">Trigger-Häufigkeit</div>
     <div class="map-bar"><div class="map-bar-fill" style="width:${n.conflict}%;background:#E8A030"></div></div>`:''}
-    ${n.note?`<div class="map-dp-lbl">Notiz</div><div style="font-size:12px;color:var(--txs)">${n.note}</div>`:''}
+    ${feelings?`<div class="map-dp-lbl">Häufige Gefühle</div><div style="font-size:11.5px;color:var(--txs)">${feelings}</div>`:''}
+    ${n.topNeed?`<div class="map-dp-lbl">Häufigstes Bedürfnis</div><div style="font-size:11.5px;color:var(--txm);font-weight:500">${n.topNeed}</div>`:''}
+    ${tips.length?`<div class="map-dp-lbl" style="margin-top:10px">Tipps für diese Beziehung</div>
+    <div style="display:flex;flex-direction:column;gap:5px">${tips.map(t=>`<div style="font-size:11.5px;color:var(--txm);padding:7px 9px;background:rgba(42,71,64,.05);border-radius:7px;line-height:1.55">✦ ${t}</div>`).join('')}</div>`:''}
+    ${n.note?`<div class="map-dp-lbl" style="margin-top:8px">Notiz</div><div style="font-size:12px;color:var(--txs)">${n.note}</div>`:''}
     <div class="map-actions">
       <button class="map-btn" onclick="showMapAddPanel(${n.id})">Bearbeiten</button>
       <button class="map-btn" onclick="filterJournal4Map('${n.src}')">Verlauf</button>
@@ -3318,12 +3419,16 @@ function saveMapNode(editId){
   const note=document.getElementById('mp-note').value.trim();
   if(editId!==null&&editId!=='null'){
     const n=mapNodes.find(x=>x.id===editId);
-    if(n)Object.assign(n,{name,quality,note});
+    if(n){
+      Object.assign(n,{name,quality,note});
+      // Persist name override so it survives re-syncs
+      if(n.src){const mn=loadMapNames();mn[n.src]=name;saveMapNames(mn);}
+    }
   } else {
     const angle=Math.random()*Math.PI*2;
     const dist=mapCX*(.38+Math.random()*.38);
     const importance=40;
-    mapNodes.push({id:mapNextId++,src:'other',name,type:name,quality,importance,energy:60,conflict:20,analysisCount:0,lastDate:null,note,
+    mapNodes.push({id:mapNextId++,src:'other',name,type:name,quality,importance,energy:60,conflict:20,analysisCount:0,lastDate:null,note,influenceScore:0,trend:'stable',dynamic:'',topNeed:null,topFeelings:[],topTags:[],
       x:mapCX+dist*Math.cos(angle),y:mapCY+dist*Math.sin(angle),r:Math.max(14,Math.min(30,(importance/100)*22+10))});
   }
   document.getElementById('mapAddPanel').style.display='none';
@@ -3343,33 +3448,46 @@ function resetMapPositions(){
 
 
 function buildMapInsight(){
+  const el=document.getElementById('mapInsight');
+  if(!el)return;
   const all=loadJournalData();
-  if(!all.length){document.getElementById('mapInsight').innerHTML='Noch keine Analysen — starte mit einer Nachricht um deine Beziehungskarte zu füllen.';return;}
-  const bySrc={};
-  all.forEach(e=>{if(!bySrc[e.src])bySrc[e.src]=[];bySrc[e.src].push(e);});
+  if(!all.length){el.innerHTML='Noch keine Analysen — starte mit einer Nachricht um deine Beziehungskarte zu füllen.';return;}
 
   const insights=[];
+
   // Most analyzed
-  const top=Object.entries(bySrc).sort((a,b)=>b[1].length-a[1].length)[0];
-  const topName=SRC_TO_KEY[top[0]]||top[0];
-  insights.push(`Du hast am häufigsten Nachrichten von <strong>${topName}</strong> verarbeitet (${top[1].length}×).`);
-
-  // Draining relationships
-  const draining=Object.entries(bySrc).filter(([src,entries])=>{
-    const ac=entries.filter(e=>e.triggers&&e.triggers.length>0).length;
-    return (ac/entries.length)>.5&&entries.length>=2;
-  }).map(([src])=>SRC_TO_KEY[src]||src);
-  if(draining.length)insights.push(`Hohe Trigger-Frequenz bei: <strong>${draining.join(', ')}</strong>.`);
-
-  // Improvement: last 3 vs first 3 triggers for top src
-  const topEntries=top[1];
-  if(topEntries.length>=6){
-    const early=topEntries.slice(-3).filter(e=>e.triggers&&e.triggers.length>0).length;
-    const recent=topEntries.slice(0,3).filter(e=>e.triggers&&e.triggers.length>0).length;
-    if(recent<early)insights.push(`Bei <strong>${topName}</strong> wurden weniger Trigger ausgelöst als früher — das ist echtes Wachstum.`);
+  const sorted=[...mapNodes].filter(n=>n.analysisCount>0).sort((a,b)=>b.analysisCount-a.analysisCount);
+  if(sorted.length){
+    const top=sorted[0];
+    insights.push(`Am häufigsten ausgewertet: <strong>${top.name}</strong> (${top.analysisCount}×).`);
   }
 
-  document.getElementById('mapInsight').innerHTML=insights.join(' ');
+  // Strongest emotional influence
+  const byInfluence=[...mapNodes].filter(n=>n.influenceScore!=null).sort((a,b)=>b.influenceScore-a.influenceScore);
+  if(byInfluence.length&&byInfluence[0].analysisCount>=2){
+    insights.push(`Stärkster emotionaler Einfluss auf dich: <strong>${byInfluence[0].name}</strong>.`);
+  }
+
+  // Improving
+  const improving=mapNodes.filter(n=>n.trend==='improving'&&n.analysisCount>=3);
+  if(improving.length){
+    insights.push(`Positive Entwicklung: <strong>${improving.map(n=>n.name).join(', ')}</strong> ↗`);
+  }
+
+  // Draining
+  const draining=mapNodes.filter(n=>n.quality==='draining'&&n.analysisCount>=2);
+  if(draining.length){
+    insights.push(`Belastend: <strong>${draining.map(n=>n.name).join(', ')}</strong> — tippe für Tipps.`);
+  }
+
+  // Growth note
+  if(all.length>=10){
+    const recentAvg=all.slice(0,5).reduce((s,e)=>s+(e.energy||50),0)/5;
+    const olderAvg=all.slice(-5).reduce((s,e)=>s+(e.energy||50),0)/5;
+    if(recentAvg>olderAvg+8)insights.push('Deine emotionale Energie in Gesprächen steigt insgesamt — sichtbares Wachstum.');
+  }
+
+  el.innerHTML=insights.slice(0,3).join(' ');
 }
 
 
