@@ -240,6 +240,11 @@ audio{width:100%;height:28px;margin-top:6px}
 .trig-item{padding:10px 12px;border-left:2px solid var(--acc);border-radius:0 8px 8px 0;background:rgba(181,90,44,.04)}
 .trig-p{font-size:12px;font-weight:500;color:var(--acc);font-style:italic;margin-bottom:3px}
 .trig-e{font-size:13px;color:var(--txm);line-height:1.55}
+.belief-item{padding:10px 12px;border-left:2px solid #7A5A8A;border-radius:0 8px 8px 0;background:rgba(122,90,138,.04);margin-bottom:8px}
+.belief-item:last-child{margin-bottom:0}
+.belief-quote{font-size:12px;font-weight:500;color:#7A5A8A;font-style:italic;margin-bottom:3px}
+.belief-core{font-size:13px;font-weight:500;color:var(--tx);margin-bottom:5px}
+.belief-reframe{font-size:12.5px;color:var(--txm);line-height:1.55;padding:6px 10px;background:rgba(122,90,138,.06);border-radius:6px}
 
 /* ─── TAGS ─── */
 .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:10px}
@@ -1159,6 +1164,14 @@ if(existingToken) {
         <div class="card-body"><div class="trig-list" id="gTrig"></div></div>
       </div>
 
+      <!-- Glaubenssätze — Pro -->
+      <div class="card" id="rc-beliefs" style="display:none">
+        <div class="card-head">
+          <div class="card-hl"><div class="cdot" style="background:#7A5A8A"></div><div><div class="cname">Glaubenssätze<span class="pro-badge">PRO</span></div><div class="csub">Verborgene Überzeugungen in der Nachricht</div></div></div>
+        </div>
+        <div class="card-body"><div id="gBeliefs"></div></div>
+      </div>
+
       <!-- Next step hint -->
       <div class="card" id="rc-train-hint" style="background:rgba(42,71,64,.04);border-color:rgba(42,71,64,.15)">
         <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -1246,6 +1259,14 @@ if(existingToken) {
             <div id="tr-pattern" style="font-size:14px;line-height:1.75;color:var(--txm)"></div>
             <div id="tr-growth" style="margin-top:12px;padding:12px 14px;background:rgba(42,71,64,.05);border-left:2px solid var(--p);border-radius:0 8px 8px 0;font-size:13px;line-height:1.65;color:var(--txm)"></div>
           </div>
+        </div>
+
+        <!-- Glaubenssätze in Trainingsantwort — Pro -->
+        <div class="card" id="tc-beliefs" style="display:none">
+          <div class="card-head">
+            <div class="card-hl"><div class="cdot" style="background:#7A5A8A"></div><div><div class="cname">Glaubenssätze in deiner Antwort<span class="pro-badge">PRO</span></div><div class="csub">Welche Überzeugungen sprechen aus deinen Worten?</div></div></div>
+          </div>
+          <div class="card-body"><div id="trBeliefs"></div></div>
         </div>
       </div>
     </div>
@@ -1458,6 +1479,11 @@ function buildGFKPrompt(msg, ctx) {
   // Repeated at end so the model cannot miss it
   const langEnforce = '\n\nCRITICAL: ' + langInstr + ' Write EVERY string value in the JSON in that language. No exceptions.';
 
+  // Glaubenssätze-Schema — nur für Pro
+  const beliefSchema = S.isPro
+    ? ',"beliefs":[{"quote":"[exact phrase from the message revealing a belief]","belief":"[the underlying belief pattern, e.g. I am not enough / I must not show weakness]","reframe":"[compassionate NVC reframe of this belief]"}]'
+    : '';
+
   // Language-neutral schema placeholders — the langInstr controls the output language
   const schemaSimple =
     '{"self":{"observation":"[factual observation, 1 sentence, no interpretation]",' +
@@ -1467,7 +1493,8 @@ function buildGFKPrompt(msg, ctx) {
     '"response":"[empathetic NVC reply, 2-3 sentences]",' +
     '"summary":"[neutral summary, 2-3 sentences]",' +
     '"tags":["tag1","tag2"],' +
-    '"triggers":[{"phrase":"[triggering phrase]","explanation":"[brief explanation]"}]}';
+    '"triggers":[{"phrase":"[triggering phrase]","explanation":"[brief explanation]"}]' +
+    beliefSchema + '}';
 
   const schemaDetailed =
     '{"self":{"observation":"[exact factual observation, no interpretation]",' +
@@ -1483,7 +1510,8 @@ function buildGFKPrompt(msg, ctx) {
     '"relationship_insight":"[one deeper insight about this relationship]",' +
     '"tags":["tag1","tag2","tag3"],' +
     '"triggers":[{"phrase":"[triggering phrase]","explanation":"[wound activated]","somatic":"[possible body sensation]"}],' +
-    '"growth_impulse":"[one concrete practice or reflection]"}';
+    '"growth_impulse":"[one concrete practice or reflection]"' +
+    beliefSchema + '}';
 
   const promptSimple = 'You are an empathetic NVC coach. ' + langInstr +
     ' Analyze this message clearly and concisely.' + ctxPart + msgPart +
@@ -2466,6 +2494,18 @@ function renderAnalysis(r,msg){
   if(growthImp&&r.growth_impulse)growthImp.textContent=r.growth_impulse;
   if(r.response_tip){const tip=document.getElementById('gRespTip');if(tip){tip.textContent=r.response_tip;tip.style.display='';}}
 
+  // Glaubenssätze (Pro)
+  const rcBeliefs=document.getElementById('rc-beliefs');
+  const gBeliefs=document.getElementById('gBeliefs');
+  if(rcBeliefs&&gBeliefs){
+    if(S.isPro&&r.beliefs&&r.beliefs.length){
+      gBeliefs.innerHTML=r.beliefs.map(b=>`<div class="belief-item"><div class="belief-quote">»${b.quote||''}«</div><div class="belief-core">💭 ${b.belief||''}</div><div class="belief-reframe">✦ ${b.reframe||''}</div></div>`).join('');
+      rcBeliefs.style.display='';
+    }else{
+      rcBeliefs.style.display='none';
+    }
+  }
+
   // Auto-save to journal
   saveEntry(r, msg);
   const jn=loadJournalData().length;
@@ -2536,6 +2576,18 @@ function renderTraining(r){
   // Pattern
   document.getElementById('tr-pattern').textContent=r.pattern||'';
   document.getElementById('tr-growth').innerHTML=r.growth?`<strong style="font-weight:500;color:var(--p)">Wachstumsimpuls:</strong> ${r.growth}`:'';
+
+  // Glaubenssätze in Trainingsantwort (Pro)
+  const tcBeliefs=document.getElementById('tc-beliefs');
+  const trBeliefs=document.getElementById('trBeliefs');
+  if(tcBeliefs&&trBeliefs){
+    if(S.isPro&&r.beliefs&&r.beliefs.length){
+      trBeliefs.innerHTML=r.beliefs.map(b=>`<div class="belief-item"><div class="belief-quote">»${b.quote||''}«</div><div class="belief-core">💭 ${b.belief||''}</div><div class="belief-reframe">✦ ${b.reframe||''}</div></div>`).join('');
+      tcBeliefs.style.display='';
+    }else{
+      tcBeliefs.style.display='none';
+    }
+  }
 
   const tr=document.getElementById('trainResults');
   tr.style.display='flex';tr.style.flexDirection='column';tr.style.gap='14px';
@@ -3458,7 +3510,10 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
     :lang==='pt'?'Responda em português.'
     :lang==='nl'?'Antwoord in het Nederlands.'
     :`Respond in ${S.outputLangName||lang}.`;
-  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"[short label]","text":"[what this response reveals about the user]"}],"recipientPerspective":[{"icon":"emoji","label":"[short label]","text":"[how it lands with the other person]"}],"values":[{"name":"[value name]","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"[short title]","description":"[short description]"},"alternatives":[{"strategy":"[name]","effect":"[short]","text":"[concrete response]","tradeoff":"[gain/loss]"}],"pattern":"[communication pattern described warmly]","growth":"[concrete growth impulse]"}\n\nCRITICAL: ${langInstr} Write EVERY string value in the JSON in that language. No exceptions.`;
+  const trainBeliefSchema = S.isPro
+    ? ',"beliefs":[{"quote":"[exact phrase from the user\'s response revealing a belief]","belief":"[the underlying belief pattern]","reframe":"[compassionate NVC reframe]"}]'
+    : '';
+  return`You are an NVC coach and communication trainer. Analyze deeply. ${langInstr} Reply ONLY with valid JSON.\n\nOriginal message: "${origMsg}"\nUser feeling: ${gfk.self?.feeling||''}\nUser need: ${gfk.self?.need||''}\n${ctx?'Context: '+ctx+'\n':''}User spontaneous response: "${userResp}"\n\n{"selfReflection":[{"icon":"emoji","label":"[short label]","text":"[what this response reveals about the user]"}],"recipientPerspective":[{"icon":"emoji","label":"[short label]","text":"[how it lands with the other person]"}],"values":[{"name":"[value name]","userScore":75,"otherScore":40,"shared":true}],"alignment":{"score":62,"title":"[short title]","description":"[short description]"},"alternatives":[{"strategy":"[name]","effect":"[short]","text":"[concrete response]","tradeoff":"[gain/loss]"}],"pattern":"[communication pattern described warmly]","growth":"[concrete growth impulse]"${trainBeliefSchema}}\n\nCRITICAL: ${langInstr} Write EVERY string value in the JSON in that language. No exceptions.`;
 }
 
 
