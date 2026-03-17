@@ -59,6 +59,17 @@
             ".ogg",
             ".aac"
           ]
+        },
+        {
+          "name": "image",
+          "accept": [
+            "image/*",
+            ".jpg",
+            ".jpeg",
+            ".png",
+            ".webp",
+            ".heic"
+          ]
         }
       ]
     }

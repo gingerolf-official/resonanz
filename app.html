@@ -32,12 +32,17 @@ async function checkIncomingShare(){
   if(urlText && !params.has('shared')){
     history.replaceState({}, '', location.pathname);
     window.__pendingShareText = urlText;
+    applyPendingShare();
     return;
   }
 
-  if(!params.has('shared')) return;
+  if(!params.has('shared')){
+    // Inline IIFE might have set __pendingShareText already
+    if(window.__pendingShareText) applyPendingShare();
+    return;
+  }
   history.replaceState({}, '', location.pathname);
-  if(!('caches' in window)) return;
+  if(!('caches' in window)){ applyPendingShare(); return; }
 
   const sc = await caches.open('resonanz-share');
 
@@ -65,6 +70,25 @@ async function checkIncomingShare(){
     await sc.delete('/__share_audio_meta');
     if(files.length) window.__pendingShareFiles = files;
   }
+
+  // Image files
+  const imgMetaR = await sc.match('/__share_image_meta').catch(() => null);
+  if(imgMetaR){
+    const meta = await imgMetaR.json();
+    const imgs = [];
+    for(const f of meta.files){
+      const fr = await sc.match('/__share_image_' + f.idx).catch(() => null);
+      if(fr){
+        const ab = await fr.arrayBuffer();
+        imgs.push(new File([ab], f.name, {type: f.type || 'image/jpeg'}));
+        await sc.delete('/__share_image_' + f.idx);
+      }
+    }
+    await sc.delete('/__share_image_meta');
+    if(imgs.length) window.__pendingShareImages = imgs;
+  }
+
+  applyPendingShare();
 }
 
 // Handle GET share immediately (no SW needed)
@@ -3205,7 +3229,8 @@ function applyPendingShare(){
   if(window.__pendingShareText){
     const txt=window.__pendingShareText;
     delete window.__pendingShareText;
-    document.getElementById('msgIn').value=txt;
+    const msgIn=document.getElementById('msgIn');
+    if(msgIn) msgIn.value=txt;
     switchITab('text',document.querySelectorAll('.itab')[0]);
     showShareBanner('text',1);
   }
@@ -3215,6 +3240,15 @@ function applyPendingShare(){
     switchITab('audio',document.querySelectorAll('.itab')[1]);
     addFiles(files);
     showShareBanner('audio',files.length);
+  }
+  if(window.__pendingShareImages&&window.__pendingShareImages.length){
+    const imgs=window.__pendingShareImages;
+    delete window.__pendingShareImages;
+    // Screenshot-Tab erfordert Pro — Gate bleibt in switchITab erhalten
+    const screenshotTab=[...document.querySelectorAll('.itab')].find(t=>t.getAttribute('onclick')&&t.getAttribute('onclick').includes('screenshot'));
+    switchITab('screenshot',screenshotTab||null);
+    addScreenshots(imgs);
+    showShareBanner('image',imgs.length);
   }
 }
 
@@ -3228,6 +3262,8 @@ function showShareBanner(type,count){
   }
   const msg=type==='audio'
     ?`📥 ${count} Audionachricht${count>1?'en':''} empfangen`
+    :type==='image'
+    ?`📥 ${count} Screenshot${count>1?'s':''} empfangen`
     :'📥 Textnachricht empfangen';
   b.innerHTML=`<span>${msg}</span><button onclick="this.parentElement.remove()" style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:15px;margin-left:4px">✕</button>`;
   setTimeout(()=>{if(b&&b.parentElement)b.remove();},5000);

@@ -36,6 +36,7 @@ async function handleShare(req) {
     const fd = await req.formData();
     const text = fd.get('text') || fd.get('url') || fd.get('title') || '';
     const audioFiles = fd.getAll('audio');
+    const imageFiles = fd.getAll('image');
     const sc = await caches.open('resonanz-share');
 
     if (text) {
@@ -57,6 +58,23 @@ async function handleShare(req) {
           headers: {
             'Content-Type': audioFiles[i].type || 'audio/ogg',
             'X-Filename': audioFiles[i].name
+          }
+        }));
+      }
+    }
+
+    if (imageFiles.length) {
+      const meta = imageFiles.map((f, i) => ({ name: f.name, type: f.type, idx: i }));
+      await sc.put('/__share_image_meta', new Response(
+        JSON.stringify({ files: meta, ts: Date.now() }),
+        { headers: { 'Content-Type': 'application/json' } }
+      ));
+      for (let i = 0; i < imageFiles.length; i++) {
+        const ab = await imageFiles[i].arrayBuffer();
+        await sc.put('/__share_image_' + i, new Response(ab, {
+          headers: {
+            'Content-Type': imageFiles[i].type || 'image/jpeg',
+            'X-Filename': imageFiles[i].name
           }
         }));
       }
