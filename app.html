@@ -1407,6 +1407,7 @@ let mapSelected  = null;
 let mapDragOX    = 0;
 let mapDragOY    = 0;
 let deferredInstall = null;
+const PWA_VERSION = '1.3'; // bump → löscht pwa_dismissed für alle Nutzer
 
 
 
@@ -3131,8 +3132,7 @@ function openMapScreen(){
 
 function doInstall(){
   if(!deferredInstall){
-    // Fallback: guide user manually
-    showToast('Drei-Punkte-Menü → App installieren');
+    showInstallGuide();
     return;
   }
   deferredInstall.prompt();
@@ -3482,6 +3482,49 @@ function buildTrainPrompt(origMsg,gfk,userResp,ctx){
   const n=loadJournalData().length;
   if(n>0)document.getElementById('step-4').querySelector('.step-num').textContent=n<=99?n:'◎';
 })();
+
+// ── PWA Install Banner ────────────────────────────
+// Version-Bump: löscht pwa_dismissed wenn PWA_VERSION sich geändert hat
+(function(){
+  if(localStorage.getItem('pwa_dismissed_v')!==PWA_VERSION){
+    localStorage.removeItem('pwa_dismissed');
+    localStorage.setItem('pwa_dismissed_v',PWA_VERSION);
+  }
+})();
+
+// Chrome/Android: beforeinstallprompt abfangen und Banner zeigen
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault();
+  deferredInstall=e;
+  var isStandalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  if(!isStandalone&&!localStorage.getItem('pwa_dismissed')){
+    document.getElementById('installBar').classList.add('show');
+  }
+});
+
+// Wenn App nach Installation geöffnet wird: Banner verstecken
+window.addEventListener('appinstalled',function(){
+  document.getElementById('installBar').classList.remove('show');
+  deferredInstall=null;
+});
+
+// Fallback nach 3s: kein beforeinstallprompt → manuellen Guide-Banner zeigen
+// (iOS Safari, Firefox, bereits dismissed-Schutz bleibt erhalten)
+setTimeout(function(){
+  var isStandalone=window.matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+  var isDismissed=localStorage.getItem('pwa_dismissed');
+  if(!deferredInstall&&!isStandalone&&!isDismissed){
+    var bar=document.getElementById('installBar');
+    var sub=bar?bar.querySelector('.install-bar-sub'):null;
+    if(sub){
+      var isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+      sub.textContent=isIOS
+        ?'Tippe auf Teilen \u2197 \u2192 Zum Home-Bildschirm'
+        :'Browser-Men\u00fc \u2192 App installieren';
+    }
+    if(bar)bar.classList.add('show');
+  }
+},3000);
 
 </script>
 </body>
