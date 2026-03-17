@@ -871,6 +871,22 @@ if(existingToken) {
           <span class="toggle-name">Kommunikations-Training</span>
           <div class="sw on" id="tsw-train" onclick="toggleSw(this,'train')"></div>
         </div>
+        <div class="toggle-row">
+          <span class="toggle-name">Glaubenssätze <span class="pro-badge">PRO</span></span>
+          <div class="sw on" id="tsw-beliefs" onclick="toggleSw(this,'beliefs')"></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-name">Gesprächsdynamik</span>
+          <div class="sw on" id="tsw-dynamics" onclick="toggleSw(this,'dynamics')"></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-name">Kommunikationsmuster</span>
+          <div class="sw on" id="tsw-comm" onclick="toggleSw(this,'comm')"></div>
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-name">Verpasste Chancen <span class="pro-badge">PRO</span></span>
+          <div class="sw on" id="tsw-opps" onclick="toggleSw(this,'opps')"></div>
+        </div>
       </div>
     </div>
 
@@ -1428,7 +1444,7 @@ const BACKEND = 'https://resonanz-backend.vercel.app'; // ← deine URL nach dem
 const S={
   model:'claude',mtype:'cloud',tab:'text',src:'partner',gfkDetail:'simple',outputLang:'de',outputLangName:'Deutsch',outputLangFlag:'🇩🇪',
   isPro:false,freeAudioToday:0,
-  togs:{self:true,resp:true,sum:true,trig:true,train:true},
+  togs:{self:true,resp:true,sum:true,trig:true,train:true,beliefs:true,dynamics:true,comm:true,opps:true},
   afiles:[],transcripts:[],popWord:null,
   lastGFK:null,curStep:1,lastMissedOpp:null
 };
@@ -2640,7 +2656,7 @@ function renderAnalysis(r,msg){
   const rcBeliefs=document.getElementById('rc-beliefs');
   const gBeliefs=document.getElementById('gBeliefs');
   if(rcBeliefs&&gBeliefs){
-    if(S.isPro&&r.beliefs&&r.beliefs.length){
+    if(t.beliefs&&S.isPro&&r.beliefs&&r.beliefs.length){
       gBeliefs.innerHTML=r.beliefs.map(b=>`<div class="belief-item"><div class="belief-quote">»${b.quote||''}«</div><div class="belief-core">💭 ${b.belief||''}</div><div class="belief-reframe">✦ ${b.reframe||''}</div></div>`).join('');
       rcBeliefs.style.display='';
     }else{
@@ -2655,7 +2671,7 @@ function renderAnalysis(r,msg){
   const rcOpps=document.getElementById('rc-chat-opps');
 
   if(rcDyn){
-    if(isChatResult&&r.dynamics){
+    if(t.dynamics&&isChatResult&&r.dynamics){
       document.getElementById('gDynamics').textContent=r.dynamics;
       const tpList=document.getElementById('gTurningPoints');
       if(tpList&&r.turning_points&&r.turning_points.length){
@@ -2666,7 +2682,7 @@ function renderAnalysis(r,msg){
   }
 
   if(rcPat){
-    if(isChatResult&&(r.my_patterns||r.their_patterns)){
+    if(t.comm&&isChatResult&&(r.my_patterns||r.their_patterns)){
       document.getElementById('gMyPatterns').textContent=r.my_patterns||'';
       document.getElementById('gTheirPatterns').textContent=r.their_patterns||'';
       rcPat.style.display='';
@@ -2674,7 +2690,7 @@ function renderAnalysis(r,msg){
   }
 
   if(rcOpps){
-    if(isChatResult&&S.isPro&&r.missed_opportunities&&r.missed_opportunities.length){
+    if(t.opps&&isChatResult&&S.isPro&&r.missed_opportunities&&r.missed_opportunities.length){
       document.getElementById('gMissedOpps').innerHTML=r.missed_opportunities.map((o,i)=>`<div class="mopp-item"><div class="mopp-head">»${o.exchange||''}«</div><div class="mopp-what">${o.what_happened||''}</div><div class="mopp-alt">${o.nvc_alternative||''}</div>${o.practice_focus?`<div class="mopp-focus">Fokus: ${o.practice_focus}</div>`:''}<div class="mopp-foot"><button class="mopp-train-btn" onclick="selectMissedOpp(${i})">Üben →</button></div></div>`).join('');
       rcOpps.style.display='';
     }else{rcOpps.style.display='none';}
