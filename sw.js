@@ -1,4 +1,4 @@
-const CACHE = 'resonanz-v4';
+const CACHE = 'resonanz-v5';
 
 self.addEventListener('install', e => {
   self.skipWaiting();
