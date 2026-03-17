@@ -1378,8 +1378,35 @@ const T = {
   }
 };
 
+// ── Journal & Map Constants ───────────────────────
+const JK = 'resonanz_journal_v1';
+const MK = 'resonanz_map_v1';
+const SRC_LABELS = {partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
+const SRC_TO_KEY  = {partner:'Partner·in',mother:'Mutter',father:'Vater',friend:'Freund·in',colleague:'Kolleg·in',other:'Andere'};
+const MAP_COLORS  = {
+  nourishing:{fill:'#3D7A68',light:'rgba(61,122,104,.12)',text:'#2A5548'},
+  challenging:{fill:'#B07840',light:'rgba(176,120,64,.12)',text:'#8A5C28'},
+  draining:   {fill:'#A04848',light:'rgba(160,72,72,.12)', text:'#7A3030'},
+  neutral:    {fill:'#6A8070',light:'rgba(106,128,112,.12)',text:'#4A6058'}
+};
 
-
+// ── Mutable global state ──────────────────────────
+let screenshots  = [];
+let jFilter      = 'all';
+let mapNodes     = [];
+let mapNextId    = 1;
+let mapReady     = false;
+let mapCvs       = null;
+let mapCtx       = null;
+let mapW         = 0;
+let mapH         = 0;
+let mapCX        = 0;
+let mapCY        = 0;
+let mapDragging  = null;
+let mapSelected  = null;
+let mapDragOX    = 0;
+let mapDragOY    = 0;
+let deferredInstall = null;
 
 
 
@@ -2352,19 +2379,20 @@ function handleMessengerShare(app){
 async function runAnalysis(){
   const old=document.getElementById('api-error-card');if(old)old.remove();
   if(S.tab==='audio'&&S.afiles.filter(f=>f.status==='p').length)await transcribeAll();
-  const msg=getText();
-  if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
-  
-  // Screenshot mode
+
+  // Screenshot mode — check pro gate, uploads, and transcription BEFORE getText()
+  // so that msg contains the actual transcript text when passed to saveEntry()
   if(S.tab==='screenshot'){
     if(!S.isPro){openProUpgrade();return;}
     if(!screenshots.length){showToast('Bitte zuerst ein Screenshot hochladen.');return;}
-    // Auto-transcribe if not done yet
     if(!S._screenshotTranscript){
       await transcribeScreenshots();
       if(!S._screenshotTranscript)return; // transcription failed
     }
   }
+
+  const msg=getText();
+  if(!msg){showToast('Bitte zuerst eine Nachricht eingeben.');return;}
   const ctx=document.getElementById('ctxIn').value.trim();
 
   // Show loading
